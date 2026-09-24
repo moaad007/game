@@ -1,0 +1,10 @@
+# Generated Graphify output
+graphify-out/
+graph.html
+graph.json
+manifest.json
+cache/
+
+# Optional: ignore common local artifacts
+.DS_Store
+Thumbs.db
