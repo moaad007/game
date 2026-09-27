@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Blossom — Word Game</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
+<script>
+  (function () {
+    function apply() {
+      var saved = null;
+      try { saved = localStorage.getItem('blossom-theme'); } catch (e) {}
+      var dark = saved !== 'light';
+      document.documentElement.classList.toggle('dark', dark);
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    }
+    apply();
+  })();
+</script>
+<style>
+    .hide-short { display: block; }
+    @media (max-height: 560px) { .hide-short { display: none !important; } }
+
+    /* Collected-word butterflies */
+    .bfly-in { transform-box: fill-box; transform-origin: 50% 50%; animation: bflyIn .35s cubic-bezier(.34,1.56,.64,1) both; }
+    @keyframes bflyIn { from { transform: scale(0); } to { transform: scale(1); } }
+    .bfly-wings { transform-box: fill-box; transform-origin: 50% 50%; animation: bflyFlap .5s ease-in-out infinite; }
+    @keyframes bflyFlap { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.42); } }
+    .parked .bfly-wings { animation-duration: 1.5s; }
+    .bfly-bob { transform-box: fill-box; transform-origin: 50% 50%; }
+    .parked .bfly-bob { animation: bflyBob 2.6s ease-in-out infinite; }
+    @keyframes bflyBob { 0%, 100% { transform: translateY(-2.5px); } 50% { transform: translateY(2.5px); } }
+    .bfly-gold { filter: drop-shadow(0 0 3px rgba(251,191,36,.9)); }
+    .bfly-word { fill: #2e1065; stroke: rgba(255,255,255,.95); stroke-width: 3.2px; paint-order: stroke; stroke-linejoin: round; }
+    .bfly-word-gold { fill: #78350f; }
+    .bfly-pts { fill: #2e1065; opacity: .85; stroke: rgba(255,255,255,.9); stroke-width: 2.4px; paint-order: stroke; stroke-linejoin: round; }
+    .bfly-pts-gold { fill: #78350f; }
+    @media (prefers-reduced-motion: reduce) {
+      .bfly-in, .bfly-wings, .bfly-bob { animation: none; }
+    }
+    .petal-stroke { stroke-width: 3; stroke-linejoin: round; }
+    .petal-stroke.bonus { stroke: #f59e0b; stroke-width: 4.5; filter: drop-shadow(0 0 3px rgba(251,191,36,.85)); }
+    .petal-svg { filter: drop-shadow(0 3px 6px rgba(147,51,234,.28)); }
+    .petal-btn { transform: rotate(var(--r, 0deg)); transition: transform .15s ease; }
+    .petal-btn:hover { transform: rotate(var(--r, 0deg)) scale(1.06); }
+    .petal-btn:active { transform: rotate(var(--r, 0deg)) scale(.94); }
+    .petal-letter { left: 50%; top: 45%; transform: translate(-50%, -50%) rotate(calc(-1 * var(--r, 0deg))); }
+
+    /* Glassmorphism: aurora orbs behind the glass */
+    .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .orb { position: absolute; border-radius: 9999px; filter: blur(70px); }
+    .orb-1 { width: 66vmax; height: 50vmax; top: -24vmax; left: 50%; margin-left: -33vmax;
+      background: radial-gradient(closest-side, rgba(192,132,252,.5), rgba(147,51,234,.24) 55%, transparent 72%); }
+    .orb-2 { width: 44vmax; height: 44vmax; top: -16vmax; left: -13vmax;
+      background: radial-gradient(closest-side, rgba(249,168,212,.45), transparent 70%); }
+    .orb-3 { width: 46vmax; height: 46vmax; bottom: -18vmax; right: -13vmax;
+      background: radial-gradient(closest-side, rgba(153,246,228,.42), transparent 70%); }
+    .orb-4 { width: 40vmax; height: 40vmax; bottom: -13vmax; left: -11vmax;
+      background: radial-gradient(closest-side, rgba(165,180,252,.45), transparent 70%); }
+    .orb-5 { width: 34vmax; height: 34vmax; top: 26%; right: -16vmax;
+      background: radial-gradient(closest-side, rgba(240,171,252,.4), transparent 70%); }
+    .orb-6 { width: 42vmax; height: 42vmax; top: 30%; left: 50%; margin-left: -21vmax;
+      background: radial-gradient(closest-side, rgba(221,214,254,.38), transparent 72%); }
+    .dark .orb-1 { background: radial-gradient(closest-side, rgba(216,180,254,.95), rgba(139,92,246,.55) 55%, transparent 72%); }
+    .dark .orb-2 { background: radial-gradient(closest-side, rgba(232,121,249,.75), transparent 70%); }
+    .dark .orb-3 { background: radial-gradient(closest-side, rgba(45,212,191,.7), transparent 70%); }
+    .dark .orb-4 { background: radial-gradient(closest-side, rgba(129,140,248,.75), transparent 70%); }
+    .dark .orb-5 { background: radial-gradient(closest-side, rgba(217,70,239,.7), transparent 70%); }
+    .dark .orb-6 { background: radial-gradient(closest-side, rgba(167,139,250,.5), transparent 72%); }
+
+    /* The play field: one large frosted sheet floating over the aurora */
+    .arena {
+      background: linear-gradient(165deg, rgba(255,255,255,.42), rgba(255,255,255,.16) 58%, rgba(255,255,255,.08));
+      -webkit-backdrop-filter: blur(22px) saturate(1.45);
+      backdrop-filter: blur(22px) saturate(1.45);
+      border: 1px solid rgba(255,255,255,.75);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 24px 64px rgba(76,29,149,.2);
+    }
+    .dark .arena {
+      background: linear-gradient(165deg, rgba(196,181,253,.04), rgba(24,16,52,.14) 48%, rgba(13,9,30,.22));
+      border-color: rgba(221,214,254,.17);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 26px 70px rgba(0,0,0,.55);
+    }
+
+    /* Frosted panels: stats bar, word pill, round icon buttons, modal cards */
+    .glass, .glass-flat {
+      background: linear-gradient(165deg, rgba(255,255,255,.66), rgba(255,255,255,.3) 55%, rgba(255,255,255,.18));
+      -webkit-backdrop-filter: blur(16px) saturate(1.5);
+      backdrop-filter: blur(16px) saturate(1.5);
+      border: 1px solid rgba(255,255,255,.82);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.24), 0 8px 32px rgba(76,29,149,.18);
+    }
+    .glass { position: relative; overflow: hidden; }
+    .glass::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(115deg, rgba(255,255,255,.42), rgba(255,255,255,.12) 30%, transparent 46%);
+    }
+    .dark .glass, .dark .glass-flat {
+      background: linear-gradient(165deg, rgba(196,181,253,.08), rgba(30,22,60,.26) 48%, rgba(14,10,32,.34));
+      border-color: rgba(221,214,254,.3);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 10px 36px rgba(0,0,0,.5);
+    }
+    .dark .glass::after {
+      background: linear-gradient(115deg, rgba(255,255,255,.12), rgba(255,255,255,.04) 30%, transparent 46%);
+    }
+
+    /* Primary action: glossy violet gradient pill with rim glow */
+    .glass-p {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 55%, #6d28d9 100%);
+      border: 1px solid rgba(255,255,255,.65);
+      box-shadow: inset 0 2px 1px rgba(255,255,255,.4), inset 0 -3px 10px rgba(46,16,101,.45), 0 6px 18px rgba(109,40,217,.4), 0 2px 6px rgba(76,29,149,.3);
+    }
+    .glass-p::after {
+      content: ''; position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(115deg, rgba(255,255,255,.5), rgba(255,255,255,.12) 30%, transparent 52%);
+    }
+    .dark .glass-p {
+      background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 45%, #7c3aed 100%);
+      border-color: rgba(233,213,255,.6);
+      box-shadow: inset 0 2px 1px rgba(255,255,255,.3), inset 0 -3px 10px rgba(46,16,101,.4), 0 0 0 1px rgba(139,92,246,.35), 0 0 24px rgba(139,92,246,.55), 0 8px 26px rgba(109,40,217,.5);
+    }
+
+    /* Secondary actions: outline pills that let the aurora through */
+    .glass-o {
+      position: relative;
+      background: rgba(255,255,255,.26);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border: 2px solid rgba(124,58,237,.55);
+      box-shadow: inset 0 0 14px rgba(124,58,237,.08), 0 4px 16px rgba(88,28,135,.14);
+    }
+    .dark .glass-o {
+      background: rgba(139,92,246,.1);
+      border-color: rgba(221,214,254,.6);
+      box-shadow: inset 0 0 16px rgba(196,181,253,.1), 0 4px 20px rgba(0,0,0,.35);
+    }
+
+    /* Gold outline action (shuffle) with warm glow */
+    .glass-a {
+      position: relative;
+      background: rgba(251,191,36,.12);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border: 2px solid rgba(245,158,11,.75);
+      box-shadow: inset 0 0 14px rgba(251,191,36,.16), 0 4px 18px rgba(245,158,11,.24);
+    }
+    .dark .glass-a {
+      background: rgba(251,191,36,.1);
+      border-color: rgba(252,211,77,.75);
+      box-shadow: inset 0 0 16px rgba(251,191,36,.14), 0 0 20px rgba(251,191,36,.3);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .arena { background: rgba(255,255,255,.88); }
+      .dark .arena { background: rgba(18,13,40,.96); }
+      .glass, .glass-flat { background: rgba(255,255,255,.85); }
+      .dark .glass, .dark .glass-flat { background: rgba(24,17,50,.96); }
+    }
+
+  </style>
+</head>
+<body class="h-dvh overflow-hidden bg-[#efeafb] dark:bg-[#0b0918] flex items-center justify-center p-2 sm:p-3">
+
+  <div class="aurora" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+    <div class="orb orb-6"></div>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="petalGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f9a8d4"/>
+        <stop offset="0.55" stop-color="#fbcfe8"/>
+        <stop offset="1" stop-color="#fce7f6"/>
+      </linearGradient>
+      <linearGradient id="petalEdge" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f9a8d4"/>
+        <stop offset="0.5" stop-color="#f472b6"/>
+        <stop offset="1" stop-color="#db2777"/>
+      </linearGradient>
+      <radialGradient id="petalBase" cx="0.5" cy="0.95" r="0.55">
+        <stop offset="0" stop-color="#db2777" stop-opacity="0.38"/>
+        <stop offset="0.6" stop-color="#db2777" stop-opacity="0.14"/>
+        <stop offset="1" stop-color="#db2777" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="petalSheen" cx="0.5" cy="0.2" r="0.45">
+        <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+        <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.18"/>
+        <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+  </svg>
+
+  <main id="game"
+    class="arena relative w-full h-full max-w-full rounded-[26px] min-[681px]:rounded-[32px] p-3 sm:p-4 overflow-hidden flex flex-col gap-[clamp(6px,1.8vh,18px)]">
+
+    <!-- Header -->
+    <header class="shrink-0 flex items-center justify-between gap-2">
+      <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-purple-900 dark:text-purple-200 dark:[text-shadow:0_0_16px_rgba(217,70,239,.55)]">🌸 Blossom</h1>
+      <div class="flex items-center gap-1.5">
+        <button id="themeBtn" aria-label="Toggle dark mode"
+          class="glass h-10 w-10 shrink-0 rounded-full text-lg text-purple-600 dark:text-purple-300 font-bold transition active:scale-95 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300 dark:focus-visible:ring-purple-700"><span id="themeIcon">🌙</span></button>
+        <button id="infoBtn" aria-label="Open instructions"
+          class="glass h-10 w-10 shrink-0 rounded-full text-lg text-purple-600 dark:text-purple-300 font-bold transition active:scale-95 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300 dark:focus-visible:ring-purple-700">?</button>
+      </div>
+    </header>
+
+    <!-- Collected-word butterflies (background, all screens) -->
+    <svg id="bflies" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Collected words"
+      class="pointer-events-none absolute inset-0 z-0 h-full w-full"></svg>
+
+    <!-- Game content (floats above the butterflies) -->
+    <div class="relative z-10 flex min-h-0 flex-1 flex-col gap-[clamp(6px,1.8vh,18px)]">
+
+    <!-- Stats bar: SCORE | WORDS MADE | BONUS LETTER -->
+    <section id="gameStats" class="glass shrink-0 w-full min-[681px]:w-1/2 mx-auto grid grid-cols-3 rounded-2xl divide-x divide-purple-300/60 dark:divide-purple-400/25">
+      <div class="flex flex-col items-center justify-center py-1.5 sm:py-2 px-1">
+        <span class="text-[12px] sm:text-[13px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">Score</span>
+        <span id="scoreDisplay" class="mt-0.5 text-2xl sm:text-3xl font-black tabular-nums leading-none text-purple-900 dark:text-purple-100">0</span>
+      </div>
+      <div class="flex flex-col items-center justify-center py-1.5 sm:py-2 px-1">
+        <span class="text-[12px] sm:text-[13px] font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">Words Made</span>
+        <span class="mt-0.5 leading-none text-purple-900 dark:text-purple-100"><span id="progressDisplay" class="text-2xl sm:text-3xl font-black tabular-nums">0</span><span class="text-base sm:text-lg font-bold text-purple-400 dark:text-purple-400">/12</span></span>
+      </div>
+      <div class="flex flex-col items-center justify-center py-1.5 sm:py-2 px-1">
+        <span class="text-[12px] sm:text-[13px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Bonus Letter</span>
+        <div class="mt-0.5 flex items-center gap-1.5 leading-none">
+          <span id="bonusBadge" class="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-amber-400 border-2 border-amber-500 text-amber-950 font-black text-sm sm:text-base shadow-sm">N</span>
+          <span class="text-[12px] sm:text-[13px] font-bold text-amber-600 dark:text-amber-400">+5pts ea</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Flower -->
+    <section id="flowerWrap" class="flex-1 min-h-0 w-full flex items-center justify-center">
+      <div id="flower" class="relative select-none" role="group" aria-label="Flower with letters"></div>
+    </section>
+
+    <!-- Current word (input pill, right under the flower) -->
+    <section aria-live="polite" class="shrink-0 w-full min-[681px]:w-1/2 mx-auto">
+      <div id="currentWord" class="glass flex min-h-[2.75rem] w-full items-center justify-center flex-wrap gap-1 rounded-full px-4 py-1.5"></div>
+    </section>
+
+    <!-- Feedback (reserved space, never clipped) -->
+    <div id="feedback" class="shrink-0 flex min-h-[1.5rem] items-center justify-center text-center text-sm sm:text-base font-semibold px-2" aria-live="assertive"></div>
+
+    <!-- Controls -->
+    <section id="controlsRow" class="shrink-0 flex flex-wrap items-center justify-center gap-1 sm:gap-2 min-[681px]:gap-2">
+      <button id="submitBtn" aria-label="Submit word"
+        class="glass-p inline-flex items-center gap-1 rounded-full text-white font-bold text-base sm:text-lg px-3 min-[681px]:px-5 py-2 sm:py-2.5 transition active:scale-95 hover:brightness-110 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300 dark:focus-visible:ring-purple-700">✓ Submit</button>
+      <button id="delBtn" aria-label="Delete last letter"
+        class="glass-o inline-flex items-center gap-1 rounded-full text-purple-700 dark:text-purple-100 font-bold text-base sm:text-lg px-3 min-[681px]:px-5 py-1.5 sm:py-2 transition active:scale-95 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300">⌫</button>
+      <button id="clearBtn" aria-label="Clear current word"
+        class="glass-o inline-flex items-center gap-1 rounded-full text-purple-700 dark:text-purple-100 font-bold text-base sm:text-lg px-3 min-[681px]:px-5 py-1.5 sm:py-2 transition active:scale-95 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300">✕ Clear</button>
+      <button id="shuffleBtn" aria-label="Shuffle outer petals"
+        class="glass-a inline-flex items-center gap-1 rounded-full text-amber-600 dark:text-amber-300 font-bold text-base sm:text-lg px-3 min-[681px]:px-5 py-1.5 sm:py-2 transition active:scale-95 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300">⇅ Shuffle</button>
+    </section>
+    </div>
+
+    <!-- Instructions modal -->
+    <div id="infoModal" class="hidden absolute inset-0 z-20 items-center justify-center rounded-[inherit] bg-purple-950/45 dark:bg-[#070514]/75 backdrop-blur-md p-4">
+      <div class="glass-flat w-full max-w-md max-h-full overflow-y-auto rounded-3xl p-4 sm:p-6">
+        <h2 class="text-xl sm:text-2xl font-extrabold text-purple-900 dark:text-purple-200 mb-2">How to play</h2>
+        <ul class="space-y-1.5 text-base text-slate-700 dark:text-slate-300 list-disc pl-5">
+          <li>Make words of <b>4+ letters</b> from the petal letters.</li>
+          <li>Every word <b>must include the center letter</b>.</li>
+          <li>Letters may be reused, but <b>only the 7 shown letters</b> are allowed.</li>
+          <li>The <b class="text-amber-600 dark:text-amber-400">yellow-bordered petal</b> is your bonus letter — <b>+5</b> each time it appears in a word.</li>
+          <li>Pangrams use <b>all 7 letters at once</b>: <b>+7</b> extra.</li>
+        </ul>
+        <div class="mt-4 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 p-4 text-base text-slate-700 dark:text-slate-300">
+          <p class="font-bold text-purple-800 dark:text-purple-300 mb-1">Scoring</p>
+          <p>
+           4–2 · 5–4 · 6–6 · 7–12 · 8+–12 (plus 3 per letter past 7)<br>
+           Perfect game = 12 words + 1 pangram.
+          </p>
+        </div>
+        <button id="infoClose"
+          class="glass-p mt-5 w-full rounded-full text-white font-bold py-2.5 transition active:scale-95 hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300">Close</button>
+      </div>
+    </div>
+
+    <!-- Complete modal -->
+    <div id="doneModal" class="hidden absolute inset-0 z-20 items-center justify-center rounded-[inherit] bg-white/80 dark:bg-[#070514]/70 p-4 backdrop-blur-md">
+      <div class="w-full max-w-md max-h-full overflow-y-auto rounded-3xl bg-gradient-to-br from-purple-600 to-fuchsia-600 p-1 shadow-2xl">
+        <div class="rounded-[calc(1.5rem-1px)] glass-flat p-5 sm:p-6 text-center">
+          <p class="text-4xl sm:text-5xl mb-1">🎉</p>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-purple-900 dark:text-purple-200">Blossom complete!</h2>
+          <p class="mt-1 text-base sm:text-lg text-slate-600 dark:text-slate-300">You found all 12 words.</p>
+          <p class="mt-3 text-4xl sm:text-5xl font-black tabular-nums text-purple-700 dark:text-purple-300"><span id="finalScore">0</span></p>
+          <p class="text-sm uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-1">Total points</p>
+          <button id="replayBtn"
+            class="glass-p mt-4 sm:mt-6 w-full rounded-full text-white font-bold py-2.5 sm:py-3 transition active:scale-95 hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300">🌸 Play again</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script>
+window.__DICT__="that this with from your have more will home about page search free other information time they site what which their news there only when contact here business also help view online first been would were services some these click like service than find price date back people list name just over state year into email health world next used work last most products music data make them should product system post city policy number such please available copyright support message after best software then good video well where info rights public books high school through each links review years order very privacy book items company read group need many user said does under general research university mail full reviews program life know games days management part could great united hotel real item international center ebay must store travel comments made development report member details line terms before hotels send right type because local those using results office education national design take posted internet address community within states area want phone shipping reserved subject between forum family long based code show even black check special prices website index being women much sign file link open today technology south case project same pages version section found sports house related security both county photo game members power while care network down computer systems three total place following download without access think north resources current posts media control water history pictures size personal since including guide shop directory board location change white text small rating rate government children during return students shopping account times sites level digital profile previous form events love main call hours image department title description insurance another shall property class still money quality every listing content country private little visit save tools reply customer compare movies include college value article york card jobs provide food source author different press learn sale around print course process teen room stock training credit point join science categories advanced west sales look left team estate conditions select windows photos thread week category note live large gallery table register however market library really action start series model features industry plan human provided required second accessories cost movie forums better questions yahoo going medical test friend come server study application cart staff articles feedback again play looking issues never users complete street topic comment financial things working against standard person below mobile less blog party payment equipment login student programs offers legal above recent park stores side problem give memory performance social quote language story sell options experience rates create body young america important field east paper single activities club example girls additional password latest something road gift question changes night hard four poker status browse issue range building seller court always result audio light write offer blue groups easy given files event release analysis request making picture needs possible might professional month major star areas future space committee hand cards problems meeting become interest child keep enter porn share similar garden schools million added reference companies listed baby learning energy delivery popular term film stories computers journal reports welcome central images president notice original head radio until cell color self council away includes track discussion archive once others entertainment agreement format least society months safety friends sure trade edition cars messages marketing tell further updated association able having provides already green studies close common drive specific several gold living collection called short arts display limited powered solutions means director daily beach past natural whether electronics five upon period planning database says official weather land average done technical window region island record direct conference environment records district calendar costs style front statement update parts ever downloads early miles sound resource present applications either document word works material written talk federal hosting rules final adult tickets thing centre requirements cheap nude kids finance true minutes else third rock gifts europe reading topics individual tips plus auto cover usually edit together videos percent fast function fact unit getting global tech meet economic player projects lyrics often subscribe submit germany amount watch included feel though bank risk thanks everything deals various words linux production commercial weight town heart advertising received choose treatment newsletter archives points knowledge magazine error camera girl currently construction toys registered clear golf receive domain methods chapter makes protection policies loan wide beauty manager position taken sort listings models known half cases step engineering simple quick none wireless license lake whole annual published later basic shows corporate church method purchase customers active response practice hardware figure materials fire holiday chat enough designed along among death writing speed html countries loss face brand discount higher effects created remember standards yellow political increase advertise kingdom base near environmental thought stuff storage doing loans shoes entry stay nature orders availability africa summary turn mean growth notes agency king european activity copy although drug pics western income force cash employment overall river commission package contents seen players engine port album regional stop supplies started administration institute views plans double build screen exchange types soon sponsored lines electronic continue across benefits needed season apply someone held anything printer condition effective believe organization effect asked mind selection casino lost tour menu volume cross anyone mortgage hope silver corporation wish inside solution mature role rather weeks addition came supply nothing certain executive running lower necessary union jewelry according clothing particular fine names homepage hour skills bush islands advice career military rental decision leave teens huge woman facilities kind sellers middle move cable opportunities taking values division coming object lesbian appropriate machine logo length actually nice score statistics client returns capital follow sample investment sent shown culture band flash lead choice went starting registration courses consumer airport foreign artist outside furniture levels channel letter mode phones ideas structure fund summer allow degree contract button releases homes super male matter custom almost took located multiple asian distribution editor industrial cause potential song cnet focus late fall featured idea rooms female responsible communications associated primary cancer numbers reason tool browser spring foundation answer voice friendly schedule documents communication purpose feature comes police everyone independent approach cameras brown physical operating hill maps medicine deal hold ratings forms glass happy wanted developed thank safe unique survey prior telephone sport ready feed animal sources mexico population regular secure navigation operations therefore simply evidence station round paypal favorite understand option master valley recently probably rentals built publications blood worldwide improve connection publisher hall larger anti networks earth parents nokia impact transfer introduction kitchen strong carolina wedding properties hospital ground overview ship accommodation owners disease excellent paid perfect hair opportunity classic basis command cities express award distance tree peter assessment ensure thus wall involved extra especially interface partners budget rated guides success maximum operation existing quite selected patients restaurants beautiful warning wine locations horse vote forward flowers stars significant lists technologies owner retail animals useful directly manufacturer ways providing rule housing takes bring catalog searches trying mother authority considered told traffic programme joined input strategy feet agent valid modern senior sexy teaching door grand testing trial charge units instead cool normal wrote enterprise ships entire educational leading metal positive fitness opinion asia football abstract uses output funds greater likely develop employees artists alternative processing responsibility resolution java guest seems publication pass relations trust contains session multi photography republic fees components vacation century academic assistance completed skin graphics indian prev expected ring grade dating pacific mountain organizations filter mailing vehicle longer consider northern behind panel floor buying match proposed default require boys outdoor deep morning otherwise allows rest protein plant reported transportation pool mini politics partner disclaimer authors boards faculty parties fish membership mission string sense modified pack released stage internal goods recommended born unless detailed race approved background except character maintenance ability maybe functions moving brands places pretty trademarks phentermine southern yourself winter battery youth pressure submitted incest debt keywords medium television interested core break purposes throughout sets dance wood itself defined papers playing awards studio reader virtual device established answers rent remote dark programming external regarding instructions offered theory enjoy remove surface minimum visual host variety teachers isbn martin manual block subjects agents increased repair fair civil steel understanding songs fixed wrong beginning hands associates finally updates desktop classes gets sector capacity requires jersey fully father electric instruments quotes officer driver businesses dead respect unknown specified restaurant trip worth procedures poor teacher eyes relationship workers farm fucking peace traditional campus showing creative coast benefit progress funding devices lord grant agree fiction hear sometimes watches careers beyond goes families museum themselves transport interesting blogs wife evaluation accepted former implementation hits zone complex galleries references presented flat flow agencies literature respective parent columbia setting scale stand economy highest helpful monthly critical frame musical definition secretary angeles networking path employee chief gives bottom magazines packages detail francisco laws changed heard begin individuals royal clean switch largest titles relevant guidelines justice connect basket applied weekly installation described demand suite vegas square chris attention advance skip diet army auction gear difference allowed correct nation selling lots piece sheet firm seven older regulations elements species jump cells module resort facility random pricing dvds certificate minister motion looks fashion directions visitors documentation monitor trading forest calls whose coverage couple giving chance vision ball ending clients actions listen discuss accept automotive naked goal successful sold wind communities clinical situation sciences markets lowest highly publishing appear emergency developing lives currency leather determine milf temperature palm announcements patient actual historical stone commerce ringtones perhaps persons difficult scientific satellite tests village accounts amateur pain xbox particularly factors coffee settings buyer cultural easily oral ford poster edge functional root closed holidays pink zealand balance monitoring graduate replies shot architecture initial label thinking scott recommend canon hardcore league waste minute provider optional dictionary cold accounting manufacturing sections chair fishing effort phase fields fantasy letters motor professor context install shirt apparel generally continued foot mass crime count breast techniques johnson quickly dollars websites religion claim driving permission surgery patch heat wild measures generation miss chemical doctor task reduce brought himself component enable exercise santa guarantee leader diamond processes soft servers alone meetings seconds jones keyword interests flight congress fuel username walk produced paperback classifieds wait supported pocket saint rose freedom argument competition creating drugs joint premium providers fresh characters attorney upgrade factor growing thousands stream apartments pick hearing eastern auctions therapy entries dates generated signed upper administrative serious prime limit began steps errors shops bondage efforts informed thoughts creek worked quantity urban practices sorted reporting essential myself tours platform load affiliate labor immediately admin nursing defense machines designated tags heavy covered recovery guys integrated configuration merchant comprehensive expert universal protect drop solid presentation languages became orange compliance vehicles prevent theme rich campaign marine improvement guitar finding examples ipod saying spirit claims porno challenge motorola acceptance strategies seem affairs touch intended towards goals hire election suggest branch charges serve affiliates reasons magic mount smart talking gave ones latin multimedia avoid certified manage corner rank computing element birth virus abuse interactive requests separate quarter procedure leadership tables define racing religious facts breakfast kong column plants faith chain developer identify avenue missing died approximately domestic sitemap recommendations moved reach comparison mental viewed moment extended sequence inch attack sorry centers opening damage reserve recipes gamma plastic produce snow placed truth counter failure follows weekend dollar camp ontario automatically films bridge native fill williams movement printing baseball owned approval draft chart played contacts readers clubs jackson equal adventure matching offering shirts profit leaders posters institutions assistant variable advertisement expect parking headlines yesterday compared determined wholesale workshop gone codes kinds extension statements golden completely teams fort lighting senate forces funny brother gene turned portable tried electrical applicable disc returned pattern hentai boat named theatre laser earlier manufacturers sponsor classical icon warranty dedicated direction harry basketball objects ends delete evening assembly nuclear taxes mouse signal criminal issued brain sexual powerful dream obtained false cast flower felt personnel passed supplied identified falls soul aids opinions promote stated stats professionals appears carry flag decided covers advantage hello designs maintain tourism priority newsletters adults clips savings graphic atom payments estimated binding brief ended winning eight anonymous iron straight script served wants miscellaneous prepared void dining alert integration dakota interview framework disk installed queen credits clearly handle sweet desk criteria pubmed dave diego hong vice associate truck behavior enlarge frequently revenue measure changing votes duty looked discussions bear gain festival laboratory ocean flights experts signs lack depth whatever logged laptop vintage train exactly explore concept nearly eligible checkout reality forgot handling origin knew gaming feeds billion destination faster intelligence bought nations route followed specifications broken tripadvisor zoom blow battle residential anime speak decisions industries protocol query clip partnership editorial expression equity provisions speech wire principles suggestions rural shared sounds replacement tape strategic judge spam economics acid bytes cent forced compatible fight apartment height null zero speaker filed obtain consulting recreation offices designer remain managed failed marriage roll korea banks participants secret bath kelly leads negative austin favorites theater springs perform healthy translation estimates font assets injury ministry drivers lawyer figures married protected proposal sharing portal waiting birthday beta fail gratis banking officials toward slightly assist conduct contained lingerie shemale legislation calling parameters jazz serving bags profiles comics matters houses postal relationships wear controls breaking combined ultimate representative frequency introduced minor finish departments residents noted displayed reduced physics rare spent performed extreme samples davis bars reviewed forecast removed helps singles administrator cycle amounts contain accuracy dual rise sleep bird pharmacy creation static scene hunter addresses lady crystal famous writer chairman violence fans speakers drink academy dynamic gender permanent agriculture dell cleaning constitutes portfolio practical delivered collectibles infrastructure exclusive seat concerns vendor originally intel utilities philosophy regulation officers reduction bids referred supports nutrition recording regions junior toll cape rings meaning secondary wonderful mine ladies ticket announced guess agreed prevention whom soccer math import posting presence instant mentioned automatic healthcare viewing maintained increasing majority connected christ dogs directors aspects ahead moon participation scheme utility preview manner matrix containing combination devel amendment despite strength guaranteed libraries proper distributed degrees enterprises delta fear seeking inches convention shares principal daughter standing voyeur comfort colors wars cisco ordering kept alpha appeal cruise bonus certification previously bookmark buildings specials beat household batteries adobe smoking becomes drives arms improved trees achieve positions dress subscription dealer contemporary nearby carried happen exposure panasonic hide permalink signature gambling refer miller provision outdoors clothes caused luxury babes frames viagra certainly indeed newspaper circuit layer printed slow removal easier liability trademark printers faqs nine adding mostly eric spot taylor trackback prints spend factory interior revised grow americans optical promotion relative amazing clock identity suites conversion feeling hidden reasonable victoria serial relief revision broadband influence ratio importance rain onto planet webmaster copies recipe permit seeing proof diff tennis bass prescription bedroom empty instance hole pets ride licensed orlando specifically bureau represent conservation pair ideal specs recorded pieces finished parks dinner lawyers stress cream runs trends yeah discover sexo patterns boxes hills javascript fourth advisor marketplace evil aware wilson shape evolution irish certificates objectives stations suggested remains greatest firms concerned euro operator structures generic encyclopedia usage charts continuing mixed census interracial peak competitive exist wheel transit suppliers salt compact poetry lights tracking angel bell keeping preparation attempt receiving matches accordance width noise engines forget array discussed accurate stephen climate reservations playstation alcohol instruction managing annotation sister differences walking explain smaller newest establish happened expressed jeff extent sharp lesbians lane paragraph kill mathematics compensation export managers aircraft modules conflict conducted versions employer occur percentage knows describe concern backup requested citizens connecticut heritage personals immediate holding trouble spread coach agricultural expand supporting audience assigned collections ages participate plug specialist cook affect virgin experienced investigation raised institution directed dealers searching sporting helping perl affected bike totally plate expenses indicate blonde proceedings transmission anderson characteristics lose organic seek experiences albums cheats extremely verzeichnis contracts guests hosted diseases concerning developers equivalent chemistry neighborhood kits variables agenda anyway continues tracks advisory curriculum logic template prince circle soil grants anywhere psychology responses atlantic circumstances investor identification leaving wildlife appliances matt elementary cooking speaking sponsors unlimited respond sizes plain exit entered keys launch wave checking printable holy acts guidance mesh trail enforcement symbol crafts highway buddy hardcover observed dean setup poll booking glossary fiscal celebrity styles unix filled bond channels ericsson appendix notify blues chocolate portion scope hampshire supplier cables cotton bluetooth controlled requirement authorities biology dental killed border ancient debate representatives starts pregnancy causes biography leisure attractions learned transactions notebook explorer historic attached opened husband disabled authorized crazy upcoming britain concert retirement scores financing efficiency comedy adopted efficient weblog linear commitment specialty bears jean carrier edited constant visa mouth meter linked portland interviews concepts reflect pure deliver wonder lessons fruit begins qualified reform lens alerts treated discovery draw mysql classified relating assume confidence alliance confirm warm neither lewis howard offline leaves engineer lifestyle consistent replace clearance connections inventory converter suck organisation babe checks reached becoming blowjob safari objective indicated sugar crew legs stick securities allen relation enabled genre slide volunteer tested rear democratic enhance exact bound parameter adapter processor node formal dimensions contribute lock hockey storm micro colleges laptops mile showed challenges editors mens threads bowl brothers recognition presents tank submission dolls estimate encourage navy regulatory inspection consumers cancel limits territory transaction manchester weapons paint delay pilot outlet contributions continuous resulting cambridge initiative novel execution disability increases ultra winner contractor episode examination potter dish plays bulletin indicates modify oxford adam truly epinions painting committed extensive affordable universe candidate databases patent slot outstanding eating perspective planned watching lodge messenger mirror tournament consideration discounts sterling sessions kernel boobs stocks buyers journals gray catalogue jennifer antonio charged broad chosen demo swiss clark hate terminal publishers nights behalf caribbean liquid rice loop salary reservation foods gourmet guard properly orleans saving remaining empire resume twenty newly raise prepare avatar depending illegal expansion vary hundreds lincoln helped premier tomorrow purchased milk decide consent drama visiting performing downtown keyboard contest collected bands boot suitable absolutely millions lunch dildo audit push chamber findings muscle featuring implement clicking scheduled polls typical tower yours misc calculator significantly chicken temporary attend shower alan sending jason tonight dear sufficient holdem shell province awareness governor beer seemed contribution measurement swimming spyware formula constitution packaging solar jose catch jane reliable consultation northwest doubt earn finder unable periods classroom tasks democracy attacks wallpaper merchandise const resistance doors symptoms resorts biggest memorial visitor twin forth insert baltimore gateway dont alumni drawing candidates charlotte ordered biological fighting transition happens preferences romance instrument bruce split themes powers bits pregnant twice classification focused physician bargain wikipedia cellular asking blocks normally spiritual hunting diabetes suit shift chip bodies photographs cutting simon writers marks flexible loved mapping numerous relatively birds satisfaction represents char indexed pittsburgh superior preferred saved paying cartoon shots intellectual moore granted choices carbon spending comfortable magnetic interaction listening effectively registry crisis outlook massive employed bright treat header poverty formed piano echo grid sheets patrick experimental puerto revolution consolidation displays plasma allowing earnings voip mystery landscape dependent mechanical journey bidding consultants risks banner applicant charter cooperation counties acquisition ports implemented directories recognized dreams blogger notification licensing stands teach occurred textbooks rapid pull hairy diversity reverse deposit seminar investments latina nasa wheels sexcam specify accessibility dutch sensitive templates formats depends boots holds router concrete editing folder womens completion upload pulse universities technique contractors milfhunter voting courts notices subscriptions calculate alexander broadcast converted metro toshiba anniversary improvements strip specification pearl accident nick accessible accessory resident plot possibly airline typically representation regard pump exists arrangements smooth conferences uniprotkb beastiality strike consumption birmingham flashing narrow afternoon threat surveys sitting putting consultant controller ownership committees legislative researchers trailer anne castle gardens missed unsubscribe antique labels willing molecular upskirt acting heads stored exam logos residence attorneys milfs antiques density hundred ryan operators strange sustainable statistical beds breasts mention innovation employers grey parallel amended operate bills bold bathroom stable opera definitions doctors lesson cinema asset scan elections drinking blowjobs reaction blank enhanced entitled severe generate stainless newspapers hospitals deluxe humor aged monitors exception lived duration bulk successfully pursuant fabric visits primarily tight domains capabilities pmid contrast recommendation flying recruitment cute organized para siemens adoption improving expensive meant capture pounds buffalo organisations plane explained seed programmes desire expertise mechanism camping jewellery meets welfare peer caught eventually marked driven measured medline bottle agreements considering innovative marshall massage rubber conclusion closing tampa thousand meat legend grace adams python monster alex bang villa bone columns disorders bugs collaboration hamilton detection cookies inner formation tutorial engineers entity cruises gate holder proposals moderator tutorials settlement lawrence roman duties valuable erotic tone collectables ethics forever dragon busy captain fantastic imagine brings heating neck wing governments purchasing scripts stereo appointed taste dealing commit tiny operational rail airlines liberal livecam trips sides tube turns corresponding descriptions cache belt jacket determination animation oracle lease productions aviation hobbies proud excess disaster console commands telecommunications instructor giant achieved injuries shipped bestiality seats approaches alarm voltage nintendo usual loading stamps appeared franklin angle vinyl highlights mining designers melbourne ongoing worst imaging betting scientists liberty blackjack convert possibility analyst commissioner dangerous garage exciting reliability thongs unfortunately respectively volunteers attachment ringtone morgan derived pleasure honor oriented eagle desktops pants columbus nurse prayer appointment workshops hurricane quiet luck postage producer represented mortgages dial responsibilities cheese comic carefully productivity investors crown underground diagnosis maker crack principle picks vacations gang semester calculated cumshot fetish applies casinos appearance smoke apache filters incorporated craft cake notebooks apart fellow blind lounge algorithm semi coins andy gross strongly cafe hilton proteins horror familiar capable douglas debian till involving investing admission epson shoe elected carrying victory sand madison terrorism editions mainly ethnic parliament actor finds seal situations fifth allocated citizen vertical corrections structural municipal describes prize occurs absolute disabilities consists anytime substance prohibited addressed lies pipe soldiers guardian lecture simulation layout initiatives concentration classics interpretation horses dirty deck wayne donate taught bankruptcy worker optimization alive temple substances prove discovered wings breaks genetic restrictions participating waters promise thin exhibition prefer ridge cabinet modem harris bringing sick dose evaluate tiffany tropical collect composition streets nationwide vector definitely shaved turning buffer purple existence commentary larry limousines developments immigration destinations lets mutual pipeline necessarily syntax attribute prison skill chairs everyday apparently surrounding mountains moves popularity inquiry ethernet checked exhibit throw trend visible cats desert postposted oldest rhode busty coordinator obviously mercury handbook greg navigate worse summit victims spaces fundamental burning escape coupons somewhat receiver substantial progressive cialis boats glance scottish championship arcade richmond sacramento impossible russell tells obvious fiber depression graph covering platinum judgment bedrooms talks filing foster modeling passing awarded testimonials trials tissue memorabilia clinton masters bonds cartridge alberta explanation folk commons cincinnati subsection fraud electricity permitted spectrum arrival okay pottery emphasis roger aspect workplace awesome confirmed counts priced wallpapers hist crash lift desired inter closer assumes heights shadow riding infection firefox lisa expense grove eligibility venture clinic healing princess mall entering packet spray studios involvement buttons placement observations vbulletin funded thompson winners extend roads subsequent dublin rolling fell motorcycle yard disclosure establishment memories nelson arrived creates faces tourist cocks mayor sean adequate senator yield presentations grades cartoons pour digest lodging tion dust hence wiki entirely replaced radar rescue undergraduate losses combat reducing stopped occupation lakes butt donations associations citysearch closely radiation diary seriously kings shooting kent adds flags baker launched elsewhere pollution conservative guestbook shock effectiveness walls abroad ebony ward drawn visited roof walker demonstrate atmosphere suggests kiss beast operated experiment targets overseas purchases dodge counsel federation pizza invited yards assignment chemicals gordon farmers queries rush absence nearest cluster vendors mpeg whereas yoga serves woods surprise lamp rico partial shoppers phil everybody couples nashville ranking jokes http simpson twiki sublime counseling palace acceptable satisfied glad wins measurements verify globe trusted copper milwaukee rack medication warehouse shareware dicke kerry receipt supposed ordinary nobody ghost violation configure stability applying southwest boss pride institutional expectations independence knowing reporter metabolism keith champion cloudy ross personally anna plenty solo sentence throat ignore uniform excellence wealth tall somewhere vacuum dancing attributes recognize brass writes plaza pdas outcomes survival quest publish screening thumbnail trans jonathan whenever nova lifetime pioneer booty forgotten acrobat plates acres venue athletic thermal essays vital telling fairly coastal config charity intelligent edinburgh excel modes obligation campbell wake stupid harbor traveler segment realize regardless enemy puzzle rising aluminum wells wishlist opens insight restricted republican secrets lucky latter merchants thick trailers repeat syndrome philips attendance penalty drum glasses enables builder vista jessica chips terry flood foto ease arguments amsterdam orgy arena adventures pupils stewart announcement tabs outcome appreciate expanded casual grown lovely extras centres jerry clause smile lands troops indoor armed broker charger regularly believed pine cooling tend gulf trucks mechanisms divorce laura shopper partly nikon customize tradition candy pills tiger donald folks sensor exposed telecom hunt angels deputy indicators sealed emissions physicians loaded fred complaint scenes experiments balls boost spanking scholarship governance mill founded supplements chronic icons tranny moral catering finger keeps pound locate camcorder trained burn implementing roses labs ourselves bread tobacco wooden motors tough roberts incident gonna dynamics conversation decrease cumshots chest pension billy revenues emerging worship bukkake capability craig herself producing churches precision damages reserves contributed solve shorts reproduction minority diverse ingredients johnny sole franchise recorder complaints facing promotions tones passion rehabilitation maintaining sight laid clay defence patches weak refund towns environments trembl divided blvd reception wise emails odds correctly insider seminars consequences makers hearts geography appearing integrity worry discrimination carter legacy marc pleased danger vitamin widely processed phrase genuine raising implications functionality paradise hybrid reads roles intermediate emotional sons leaf glory platforms bigger billing diesel versus combine overnight geographic exceed saudi fault preliminary districts introduce silk promotional kate chevrolet babies compiled romantic revealed specialists generator examine jimmy graham suspension bristol compaq correction wolf slowly authentication communicate rugby supplement showtimes portions infant promoting sectors samuel fluid grounds fits kick regards meal hurt machinery bandwidth unlike equation baskets probability dimension wright barry proven schedules admissions cached warren slip studied reviewer involves quarterly profits devil grass comply marie florist illustrated cherry continental alternate deutsch achievement limitations webcam cuts funeral nutten earrings enjoyed automated chapters charlie quebec nipples passenger convenient dennis mars francis sized manga noticed socket silent literary signals caps orientation pill theft childhood swing symbols meta humans analog facial choosing talent dated flexibility seeker wisdom shoot boundary mint packard offset payday philip elite spin holders believes swedish poems deadline jurisdiction robot displaying witness collins equipped stages encouraged winds powder broadway acquired assess wash cartridges stones entrance gnome roots declaration losing attempts gadgets noble glasgow automation impacts gospel advantages shore loves induced knight preparing loose aims recipient linking extensions appeals earned illness islamic athletics southeast ieee alternatives pending parker determining corp personalized kennedy conditioning teenage soap triple cooper vincent secured unusual answered partnerships destruction slots increasingly migration disorder routine toolbar basically rocks conventional titans applicants wearing axis sought genes mounted habitat firewall median guns scanner herein occupational animated horny judicial adjustment hero integer treatments bachelor attitude camcorders engaged falling basics montreal carpet struct lenses binary genetics attended difficulty punk collective coalition dropped enrollment duke pace besides wage producers collector hosts interfaces advertisers moments atlas strings dawn representing observation feels torture carl deleted coat mitchell rica restoration convenience returning ralph opposition container defendant warner confirmation embedded inkjet supervisor wizard corps actors liver peripherals liable brochure morris bestsellers petition eminem recall antenna picked assumed departure minneapolis belief killing bikini memphis shoulder decor lookup texts harvard brokers diameter doll podcast seasons interactions refine bidder singer evans herald literacy fails aging intervention pissing plugin attraction diving invite modification alice latinas suppose customized reed involve moderate terror younger thirty mice opposite understood rapidly dealtime temp intro assurance fisting clerk happening vast mills outline amendments tramadol holland receives jeans metropolitan compilation verification fonts wrap refers mood favor veterans quiz sigma attractive xhtml occasion recordings jefferson victim demands sleeping careful beam gardening obligations arrive orchestra sunset tracked moreover minimal polyphonic lottery tops framed aside outsourcing licence adjustable allocation michelle essay discipline demonstrated dialogue identifying alphabetical camps declared dispatched aaron handheld trace disposal shut florists packs installing switches voluntary ncaa thou consult greatly blogging mask cycling midnight commonly photographer inform coal messaging pentium quantum murray intent largely pleasant announce constructed additions requiring spoke arrow engagement sampling rough weird refinance lion inspired holes weddings blade suddenly oxygen cookie meals canyon goto meters merely calendars arrangement conclusions passes bibliography pointer compatibility stretch durham furthermore permits cooperative neil sleeve netscape cleaner cricket beef feeding stroke township rankings measuring hats robin robinson jacksonville strap headquarters sharon crowd transfers surf olympic transformation remained attachments entities customs administrators personality rainbow hook roulette decline gloves medicare cord skiing cloud facilitate subscriber valve hewlett explains proceed flickr feelings knife priorities shelf bookstore timing liked parenting adopt denied fotos incredible britney freeware fucked donation outer crop deaths rivers commonwealth pharmaceutical manhattan tales katrina workforce nodes thumbs seeds cited lite targeted organizational skype realized twelve founder decade gamecube dispute portuguese tired titten adverse everywhere excerpt steam discharge drinks voices acute climbing stood sing tons perfume carol honest albany hazardous restore stack methodology somebody housewares reputation resistant democrats recycling hang curve creator amber qualifications museums coding slideshow tracker variation passage transferred trunk hiking pierre jelsoft headset photograph oakland waves camel distributor lamps underlying hood wrestling archived photoshop arabia gathering projection juice chase mathematical logical sauce fame extract specialized diagnostic indianapolis payable corporations courtesy criticism automobile confidential statutory accommodations athens northeast downloaded judges retired remarks detected decades paintings walked arising bracelet eggs juvenile injection yorkshire populations protective afraid acoustic railway cassette initially indicator pointed causing mistake norton locked eliminate fusion mineral sunglasses ruby steering beads fortune preference canvas threshold parish claimed screens cemetery planner flows stadium exploration mins fewer sequences coupon nurses stem proxy gangbang astronomy lanka edwards drew contests translate announces costume tagged berkeley voted bikes gates adjusted tune bishop pulled corn shaped compression seasonal establishing farmer counters puts constitutional grew perfectly slave instantly cultures norfolk coaching examined trek encoding litigation submissions heroes painted lycos zdnet broadcasting horizontal artwork cosmetic resulted portrait terrorist informational ethical carriers ecommerce mobility floral builders ties struggle schemes suffering neutral fisher spears prospective dildos bedding ultimately joining heading equally artificial bearing spectacular coordination connector brad combo seniors worlds guilty affiliated activation naturally haven tablet jury tail subscribers charm lawn violent mitsubishi underwear basin soup potentially ranch constraints crossing inclusive dimensional cottage drunk considerable crimes resolved mozilla byte toner nose latex branches anymore oclc delhi holdings alien locator selecting processors pantyhose broke difficulties juan complexity constantly browsing resolve barcelona presidential documentary territories melissa thesis thru jews nylon palestinian discs rocky bargains frequent trim ceiling pixels ensuring hispanic legislature hospitality anybody procurement diamonds espn fleet untitled bunch totals marriott singing theoretical afford exercises starring referral surveillance optimal quit distinct protocols lung highlight substitute inclusion hopefully brilliant turner sucking cents reuters todd spoken omega evaluated stayed civic assignments manuals doug sees termination watched saver thereof grill households redeem rogers grain authentic regime wanna wishes bull montgomery architectural louisville depend differ macintosh movements ranging monica repairs breath amenities virtually cole mart candle hanging colored authorization tale verified lynn formerly projector situated comparative seeks herbal loving strictly routing docs stanley psychological surprised retailer vitamins elegant gains renewal genealogy opposed deemed scoring expenditure panties brooklyn liverpool sisters critics connectivity spots algorithms hacker similarly margin coin solely fake salon collaborative norman excluding turbo headed voters cure madonna commander arch murphy thinks thats suggestion hdtv soldier phillips asin aimed justin bomb harm interval mirrors spotlight tricks reset brush investigate expansys panels repeated assault connecting spare logistics deer kodak tongue bowling danish monkey proportion filename skirt florence invest honey analyzes drawings significance scenario lovers atomic approx symposium gauge essentials junction protecting faced rachel solving transmitted weekends screenshots produces oven intensive chains kingston sixth engage deviant noon switching quoted adapters correspondence farms imports supervision cheat bronze expenditures sandy separation testimony suspect celebrities macro sender mandatory boundaries crucial syndication celebration adjacent filtering tuition spouse exotic viewer signup threats puzzles reaching damaged cams receptor laugh joel surgical destroy citation pitch autos premises perry proved offensive imperial dozen benjamin deployment teeth cloth studying colleagues stamp lotus salmon olympus separated proc cargo directive salem mate starter upgrades likes butter pepper weapon luggage burden chef tapes zones races isle stylish slim maple luke grocery offshore governing retailers depot kenneth comp blend harrison julie occasionally attending emission spec finest realty janet penn recruiting apparent instructional phpbb autumn traveling probe midi permissions biotechnology toilet ranked jackets routes packed excited outreach helen mounting recover tied lopez balanced prescribed catherine timely talked upskirts debug delayed chuck reproduced dale explicit calculation villas ebook consolidated exclude peeing occasions brooks equations newton oils sept exceptional anxiety bingo whilst spatial respondents unto ceramic prompt precious minds annually considerations scanners xanax pays fingers sunny ebooks delivers queensland necklace musicians leeds composite unavailable cedar arranged lang theaters advocacy raleigh stud fold essentially designing threaded qualify fingering blair hopes assessments mason diagram burns pumps ejaculation footwear peoples victor mario attach licenses utils removing advised brunswick spider phys ranges pairs sensitivity trails preservation hudson isolated calgary interim assisted divine streaming approve chose compound intensity technological syndicate abortion dialog venues blast wellness calcium newport antivirus addressing pole discounted indians shield harvest membrane prague previews constitute locally concluded pickup desperate mothers nascar demonstration governmental manufactured candles graduation mega bend sailing variations moms sacred addiction chrome tommy springfield refused brake exterior greeting ecology oliver glen delays synthesis olive undefined unemployment cyber verizon scored enhancement newcastle clone dicks velocity lambda relay composed tears performances oasis baseline angry societies silicon identical petroleum compete norwegian lover belong honolulu beatles lips escort retention exchanges pond rolls thomson barnes soundtrack wondering daddy ferry rabbit profession seating separately physiology collecting exports omaha tire participant scholarships recreational dominican electron loads friendship heather passport motel unions treasury warrant solaris frozen occupied josh royalty scales rally observer sunshine strain drag ceremony somehow arrested expanding provincial investigations ripe yamaha rely medications hebrew gained rochester dying laundry stuck solomon placing stops homework adjust assessed advertiser enabling encryption filling downloadable sophisticated imposed silence scsi focuses soviet possession laboratories treaty vocal trainer organ stronger volumes advances vegetables lemon toxic thumbnails darkness nuts nail bizrate vienna implied span stanford stockings joke respondent packing statute rejected satisfy destroyed shelter chapel gamespot manufacture layers wordpress guided vulnerability accountability celebrate accredited appliance compressed bahamas powell mixture zoophilia bench univ rider scheduling radius perspectives mortality logging hampton christians borders therapeutic pads butts inns bobby impressive sheep accordingly architect railroad lectures challenging wines nursery harder cups microwave cheapest accidents travesti relocation stuart contributors salvador salad monroe tender violations foam temperatures paste clouds competitions discretion preserve poem vibrator unsigned staying cosmetics theories repository praise jeremy venice concentrations vibrators christianity veteran streams landing signing executed katie negotiations realistic showcase integral asks relax generating christina congressional synopsis hardly prairie reunion composer bean sword absent photographic sells hoping accessed spirits modifications coral pixel float colin bias imported paths bubble acquire contrary millennium tribune vessel acids focusing viruses cheaper admitted dairy admit fancy equality achieving stickers fisheries exceptions reactions leasing lauren beliefs macromedia companion squad analyze ashley scroll relate divisions swim wages additionally suffer forests fellowship nano invalid concerts martial males victorian retain execute tunnel genres patents copyrights chaos mastercard wheat chronicles obtaining beaver updating distribute readings decorative kijiji confused compiler enlargement eagles bases accused campaigns unity loud conjunction bride rats defines airports instances indigenous begun brunette packets anchor socks validation parade corruption stat trigger incentives cholesterol gathered essex notified differential beaches folders dramatic surfaces terrible routers cruz pendant dresses baptist scientist starsmerchant hiring clocks arthritis bios females wallace nevertheless reflects taxation fever cuisine surely practitioners transcript myspace theorem inflation thee ruth pray stylus compounds pope drums contracting topless arnold structured reasonably jeep chicks bare hung cattle radical graduates rover recommends controlling treasure reload distributors flame levitra tanks assuming monetary elderly arlington mono particles floating extraordinary tile indicating spell hottest stevens coordinate exclusively emily alleged limitation widescreen compile squirting webster struck illustration plymouth warnings construct apps inquiries bridal annex inspiration tribal curious affecting freight rebate meetup eclipse downloading shuttle aggregate stunning cycles affects forecasts detect sluts actively ciao ampland knee prep complicated chem fastest butler shopzilla injured decorating payroll cookbook expressions courier uploaded shakespeare hints collapse americas connectors twinks unlikely pros conflicts techno beverage tribute wired elvis immune travelers forestry barriers cant rarely infected offerings martha genesis barrier argue incorrect trains metals bicycle furnishings letting arise celtic thereby jamie particle perception minerals advise humidity bottles boxing bangkok renaissance pathology sara ordinance hughes photographers infections jeffrey chess operates brisbane configured survive oscar festivals menus joan possibilities duck reveal canal amino contributing herbs clinics manitoba analytical missions watson lying costumes strict dive saddam circulation drill offense threesome bryan protest handjob assumption jerusalem hobby tries transexuales invention nickname technician inline executives enquiries washing staffing cognitive exploring trick enquiry closure raid timber volt intense playlist registrar showers supporters ruling steady dirt statutes withdrawal myers drops predicted wider saskatchewan cancellation plugins enrolled sensors screw ministers publicly hourly blame geneva freebsd veterinary acer prostores reseller dist handed suffered intake informal relevance incentive butterfly tucson mechanics heavily swingers fifty headers mistakes numerical geek uncle defining xnxx counting reflection sink accompanied assure invitation devoted princeton jacob sodium randy spirituality hormone meanwhile proprietary childrens brick grip naval thumbzilla medieval porcelain bridges pichunter captured watt thehun decent casting dayton translated shortly cameron columnists pins carlos reno donna andreas warrior diploma cabin innocent bdsm scanning consensus polo valium copying delivering cordless horn eddie fired journalism prot trivia perth frog grammar intention disagree klein harvey tires logs undertaken hazard retro livesex statewide semiconductor gregory episodes boolean circular anger mainland illustrations suits chances interact snap happiness substantially bizarre glenn auckland olympics fruits identifier worldsex ribbon calculations jpeg conducting startup suzuki kissing handy swap exempt crops reduces accomplished calculators geometry impression flip guild correlation gorgeous capitol dishes barbados chrysler nervous refuse extends fragrance replica plumbing brussels tribe neighbors trades superb buzz transparent nuke trinity charleston handled legends boom calm champions floors selections projectors inappropriate exhaust comparing shanghai speaks burton vocational davidson copied scotia farming pharmacies fork troy roller introducing batch organize appreciated alter nicole latino edges mixing handles skilled fitted albuquerque harmony distinguished asthma projected assumptions shareholders twins developmental zope regulated triangle amend anticipated oriental reward windsor completing gmbh hydrogen webshots sprint comparable chick advocate sims confusion copyrighted tray inputs warranties genome escorts documented thong medal paperbacks coaches vessels walks sucks keyboards sage knives vulnerable arrange artistic honors booth indie reflected unified bones breed detector ignored polar fallen precise sussex respiratory notifications msgid transexual mainstream invoice evaluating subcommittee gather suse maternity backed alfred colonial carey motels forming embassy cave journalists danny rebecca slight proceeds indirect amongst wool foundations msgstr arrest volleyball adipex horizon deeply toolbox marina liabilities prizes browsers decreased patio tolerance surfing creativity lloyd describing optics pursue lightning overcome eyed quotations grab inspector attract brighton beans bookmarks ellis disable snake succeed leonard lending oops reminder nipple searched behavioral riverside bathrooms plains raymond insights abilities initiated sullivan midwest karaoke trap lonely fool nonprofit lancaster suspended hereby observe julia containers attitudes karl berry collar simultaneously racial integrate bermuda amanda sociology mobiles screenshot exhibitions kelkoo confident retrieved exhibits officially consortium dies terrace bacteria replied seafood novels recipients playboy ought delicious traditions jail safely finite kidney periodically fixes sends durable mazda allied throws moisture hungarian roster referring symantec spencer wichita nasdaq transform timer tablets tuning gotten educators tyler futures vegetable verse highs humanities independently wanting custody scratch launches ipaq alignment masturbating henderson britannica comm ellen competitors rocket bullet towers racks lace nasty visibility latitude consciousness tumor ugly deposits beverly mistress encounter trustees watts duncan reprints hart bernard resolutions ment accessing forty tubes attempted midlands priest floyd analysts queue trance locale nicholas biol bundle hammer invasion witnesses runner rows administered notion skins mailed fujitsu spelling arctic exams rewards beneath strengthen defend frederick medicaid treo infrared seventh gods welsh belly aggressive advertisements quarters stolen sublimedirectory soonest disturbed determines sculpture poly ears fist naturals motivation lenders pharmacology fitting fixtures bloggers mere agrees passengers quantities petersburg consistently powerpoint cons surplus elder sonic obituaries cheers taxi punishment appreciation subsequently belarus zoning gravity providence thumb restriction incorporate backgrounds treasurer guitars essence flooring lightweight mighty athletes humanity transcription holmes complications scholars scripting remembered galaxy chester snapshot caring worn synthetic shaw segments testament expo dominant twist specifics itunes stomach partially buried newbie minimize darwin ranks wilderness debut generations tournaments bradley deny anatomy bali judy sponsorship headphones fraction trio proceeding cube defects volkswagen uncertainty breakdown milton marker reconstruction subsidiary strengths clarity rugs sandra adelaide encouraging furnished monaco settled folding emirates terrorists airfare comparisons beneficial distributions vaccine belize crap fate viewpicture promised volvo penny robust bookings threatened minolta republicans discusses porter gras jungle responded abstracts ivory alpine prediction pharmaceuticals andale fabulous remix alias thesaurus individually battlefield literally newer ecological spice oval implies soma cooler appraisal consisting maritime periodic submitting overhead ascii prospect shipment breeding citations geographical donor tension href benz trash shapes wifi tier earl manor envelope diane homeland disclaimers championships excluded andrea breeds rapids disco sheffield bailey endif finishing emotions wellington incoming prospects lexmark cleaners bulgarian eternal cashiers guam cite aboriginal remarkable rotation preventing productive boulevard eugene metric compliant minus penalties bennett imagination hotmail refurbished joshua varied grande closest activated actress mess conferencing assign armstrong politicians trackbacks accommodate tigers aurora slides milan premiere lender villages shade chorus christine rhythm digit argued dietary symphony clarke sudden accepting precipitation marilyn lions findlaw pools lyric claire isolation speeds sustained matched approximate rope carroll rational programmer fighters chambers dump greetings inherited warming incomplete vocals chronicle fountain chubby grave legitimate biographies burner investigator plaintiff finnish gentle prisoners deeper muslims hose mediterranean nightlife footage howto worthy reveals architects saints entrepreneur carries freelance excessive devon screensaver helena saves regarded valuation unexpected cigarette characteristic marion lobby metallica outlined consequently headline treating punch appointments gotta cowboy narrative enormous karma consist betty queens academics pubs quantitative shemales lucas screensavers subdivision tribes defeat clicks distinction naughty hazards insured harper livestock mardi exemption tenant sustainability cabinets tattoo shake algebra shadows holly formatting silly nutritional mercy hartford freely marcus sunrise wrapping mild weblogs timeline belongs readily affiliation fence nudist infinite diana ensures relatives lindsay clan legally shame satisfactory revolutionary bracelets sync civilian telephony mesa fatal remedy realtors breathing briefly thickness adjustments graphical genius discussing aerospace fighter meaningful flesh retreat adapted barely wherever estates democrat borough maintains failing shortcuts retained voyeurweb pamela andrews marble extending jesse specifies hull logitech surrey briefing belkin accreditation blackberry highland meditation modular microphone macedonia combining brandon instrumental giants organizing shed balloon moderators winston memo solved tide hawaiian standings partition invisible gratuit consoles funk magnet translations cayman jaguar reel sheer commodity posing wang kilometers bind rand hopkins urgent guarantees infants gothic cylinder witch buck indication congratulations cohen usgs puppy kathy acre graphs surround cigarettes revenge expires enemies lows controllers aqua chen emma consultancy finances accepts enjoying conventions patrol smell pest italiano coordinates carnival roughly sticker promises responding reef physically divide stakeholders hydrocodone consecutive cornell satin deserve attempting mailto promo representations chan worried tunes garbage competing combines beth bradford phrases peninsula chelsea boring reynolds jill accurately speeches reaches schema considers sofa catalogs ministries vacancies quizzes parliamentary prefix lucia savannah barrel typing nerve dans planets deficit boulder pointing renew coupled viii metadata circuits floppy texture handbags somerset incurred acknowledge thoroughly antigua nottingham thunder tent caution identifies questionnaire qualification locks modelling namely miniature dept hack dare euros interstate pirates aerial hawk consequence rebel systematic perceived origins hired makeup textile lamb nathan tobago presenting troubleshooting indexes centuries magnitude richardson fragrances vocabulary licking earthquake fundraising markers weights geological assessing lasting wicked introduces kills roommate webcams pushed webmasters computational acdbentity participated junk handhelds lucy answering hans impressed slope reggae failures poet conspiracy surname theology nails evident whats rides rehab epic saturn organizer allergy sake twisted combinations preceding merit enzyme cumulative zshops planes edmonton tackle disks condo pokemon amplifier ambien arbitrary prominent retrieve lexington vernon sans worldcat titanium fairy builds contacted shaft lean recorders occasional leslie casio deutsche postings innovations kitty postcards dude drain monte fires blessed luis reviewing cardiff cornwall favors potato panic explicitly sticks leone transsexual citizenship excuse reforms basement onion strand sandwich lawsuit alto informative girlfriend bloomberg cheque hierarchy influenced banners reject abandoned circles italic beats merry scuba gore complement cult dash passive valued cage checklist bangbus requesting courage verde lauderdale scenarios gazette hitachi divx extraction batman elevation hearings coleman utilization beverages calibration jake eval efficiently anaheim ping textbook dried entertaining prerequisite luther frontier settle stopping refugees knights hypothesis palmer medicines flux derby peaceful altered pontiac regression doctrine scenic trainers muze enhancements renewable intersection passwords sewing consistency collectors conclude munich celebs propose lighter rage adsl prix astrology advisors pavilion tactics trusts occurring supplemental travelling talented annie pillow induction derek precisely shorter harley spreading provinces relying finals steal parcel refined fifteen widespread incidence fears predict boutique acrylic rolled tuner avon incidents peterson rays shannon toddler enhancing flavor alike walt homeless horrible hungry metallic acne blocked interference warriors listprice libs undo cadillac atmospheric sagem knowledgestorm dana halo curtis parental referenced strikes lesser publicity marathon proposition gays pressing gasoline dressed scout belfast exec dealt niagara warcraft charms catalyst trader bucks allowance denial designation thrown prepaid raises duplicate electro criterion badge wrist civilization analyzed heath tremendous ballot varying remedies validity trustee maui handjobs weighted squirt performs plastics realm corrected jenny helmet salaries postcard elephant encountered tsunami scholar nickel internationally surrounded buses expedia geology creatures coating commented wallet cleared smilies vids accomplish boating drainage shakira corners broader vegetarian rouge yeast yale newfoundland clearing investigated ambassador coated intend stephanie contacting vegetation doom findarticles louise kenny specially owen routines hitting yukon beings bite issn aquatic reliance habits striking myth infectious podcasts singh gilbert continuity brook outputs phenomenon ensemble insulin assured biblical weed conscious accent mysimon eleven wives ambient utilize mileage oecd prostate adaptor auburn unlock hyundai pledge vampire angela relates nitrogen xerox dice merger softball referrals quad dock differently firewire mods nextel framing musician blocking sorts integrating vsnet limiting dispatch revisions restored hint armor riders chargers remark dozens varies msie reasoning rendered picking charitable guards annotated convinced openings buys burlington replacing researcher watershed councils occupations acknowledged nudity kruger pockets granny pork equilibrium viral inquire pipes characterized laden aruba cottages realtor merge privilege edgar develops qualifying chassis estimation barn pushing fleece pediatric fare asus pierce allan dressing techrepublic sperm bald filme craps fuji frost leon institutes mold dame sally yacht tracy prefers drilling brochures herb alot breach whale traveller appropriations suspected tomatoes benchmark beginners instructors highlighted bedford stationery idle mustang unauthorized clusters antibody competent momentum wiring pastor calvin shark contributor demonstrates phases grateful emerald gradually laughing grows cliff desirable tract ballet journalist abraham bumper afterwards webpage religions garlic hostels shine explosion banned wendy briefs signatures diffs cove mumbai ozone disciplines casa daughters conversations radios tariff nvidia opponent pasta simplified muscles serum wrapped swift motherboard runtime inbox focal bibliographic eden distant incl champagne decimal deviation superintendent propecia samba hostel housewives employ penguin magical influences inspections irrigation miracle manually reprint reid hydraulic centered robertson flex yearly penetration wound belle rosa conviction hash omissions writings hamburg lazy retrieval qualities cindy lolita fathers carb charging lined prototype importantly petite apparatus terrain pens explaining strips gossip rangers nomination empirical rotary worm dependence discrete beginner boxed sexuality polyester cubic deaf commitments suggesting sapphire kinase skirts mats remainder crawford labeled privileges televisions specializing marking commodities sheriff griffin declined spies blah mime neighbor motorcycles elect highways thinkpad concentrate intimate reproductive preston deadly feof bunny chevy molecules rounds longest refrigerator tions intervals sentences dentists usda exclusion workstation holocaust keen flyer peas dosage receivers urls disposition variance navigator investigators baking marijuana adaptive computed needle baths cathedral brakes nirvana fairfield owns invision sticky destiny generous madness emacs climb blowing fascinating landscapes heated lafayette jackie computation cardiovascular sparc cardiac salvation dover adrian predictions accompanying vatican brutal learners selective arbitration configuring token editorials zinc sacrifice seekers guru removable convergence yields gibraltar levy suited numeric anthropology skating kinda aberdeen emperor grad malpractice dylan bras belts blacks educated rebates reporters burke proudly necessity rendering inserted pulling basename kyle obesity curves suburban touring clara vertex hepatitis nationally tomato andorra waterproof expired travels flush waiver pale specialties hayes humanitarian invitations functioning delight survivor garcia cingular economies alexandria bacterial counted undertake declare continuously johns valves gaps impaired achievements donors tear jewel teddy convertible teaches ventures bufing stranger tragedy julian nest dryer painful velvet tribunal ruled nato pensions prayers funky secretariat nowhere paragraphs gale joins adolescent nominations wesley lately cancelled scary mattress mpegs brunei likewise banana introductory slovak cakes stan reservoir occurrence idol bloody mixer remind worcester sbjct demographic charming tooth disciplinary annoying respected stays disclose affair drove washer upset restrict springer beside mines portraits rebound logan mentor interpreted evaluations fought baghdad elimination metres hypothetical immigrants complimentary helicopter pencil freeze performer titled commissions sphere powerseller moss ratios concord graduated endorsed surprising walnut lance ladder italia unnecessary dramatically sherman cork maximize hansen senators workout yugoslavia bleeding characterization colon likelihood lanes purse fundamentals contamination endangered compromise masturbation optimize stating dome caroline expiration namespace align peripheral bless engaging negotiation crest opponents triumph nominated confidentiality electoral changelog welding orgasm deferred alternatively heel alloy condos plots polished yang gently greensboro tulsa locking casey controversial draws fridge blanket bloom simpsons elliott recovered fraser justify upgrading blades loops surge frontpage trauma tahoe advert possess demanding defensive flashers subaru forbidden vanilla programmers monitored installations deutschland picnic souls arrivals spank practitioner motivated dumb smithsonian hollow vault securely examining fioricet groove revelation pursuit delegation wires dictionaries mails backing greenhouse sleeps blake transparency travis endless figured orbit currencies bacon survivors positioning heater colony cannon circus promoted forbes descending paxil spine trout enclosed feat temporarily ntsc cooked thriller transmit apnic fatty gerald pressed frequencies scanned reflections hunger mariah municipality usps joyce detective surgeon cement experiencing fireplace endorsement planners disputes textiles missile intranet closes psychiatry persistent conf marco assists summaries glow gabriel auditor aquarium violin prophet bracket looksmart isaac oxide oaks magnificent erik colleague naples promptly modems adaptation harmful paintball prozac sexually enclosure dividend newark paso glucose phantom norm playback supervisors westminster turtle distances absorption treasures warned neural ware fossil hometown badly transcripts apollo disappointed persian continually communist collectible handmade greene entrepreneurs robots creations jade scoop acquisitions foul keno earning mailman sanyo nested biodiversity excitement movers verbal blink presently seas carlo workflow mysterious novelty bryant tiles voyuer librarian subsidiaries switched stockholm tamil garmin pose fuzzy indonesian grams therapist richards mrna budgets toolkit promising relaxation goat render carmen thereafter hardwood erotica temporal sail forge commissioners dense brave forwarding awful nightmare airplane reductions southampton istanbul impose organisms sega telescope viewers asbestos portsmouth cdna meyer enters savage advancement harassment willow resumes bolt gage throwing existed generators wagon barbie knock urge smtp generates potatoes thorough replication inexpensive kurt receptors peers roland optimum neon interventions quilt huntington creature ours mounts syracuse internship lone refresh aluminium snowboard beastality webcast michel evanescence subtle coordinated notre shipments stripes firmware antarctica cope shepherd cradle chancellor mambo lime kirk flour controversy legendary bool sympathy choir avoiding beautifully blond expects jumping fabrics antibodies polymer hygiene poultry virtue burst examinations surgeons bouquet immunology promotes mandate wiley departmental spas corpus johnston terminology gentleman fibre reproduce convicted shades jets indices roommates adware intl threatening spokesman zoloft activists frankfurt prisoner daisy halifax encourages ultram cursor assembled earliest donated stuffed restructuring insects terminals crude morrison maiden simulations sufficiently examines viking myrtle bored cleanup yarn knit conditional crossword bother budapest conceptual knitting attacked mating compute redhead arrives translator automobiles tractor continent unwrap fares longitude resist challenged telecharger hoped pike safer insertion instrumentation hugo wagner constraint groundwater touched strengthening cologne gzip wishing ranger smallest insulation newman marsh ricky ctrl scared theta infringement bent subjective monsters asylum lightbox robbie stake cocktail outlets varieties arbor mediawiki configurations poison petal blossom apple grape mango melon peach plum meadow";window.__PUZZLES__=[["elorsdc","e","o"],["tsainer","t","s"],["nstapru","s","a"],["aruohst","t","s"],["ramsnhe","a","e"],["itnsauo","n","i"],["atsopeg","s","e"],["nilotas","a","t"],["edtosin","e","n"],["asdtper","e","a"],["lahitce","t","e"],["lemnpti","e","i"],["tnoirec","e","t"],["eaftcir","r","a"],["arectli","e","r"],["isnaerc","e","a"],["lercanu","a","e"],["hcirsto","s","t"],["odtrine","e","n"],["ocerand","e","r"],["nrsetip","e","t"],["endstri","e","s"],["antgeio","n","t"],["tspreni","e","t"],["tasrino","t","a"],["arunlts","a","s"],["arepidm","e","r"],["uasierm","s","e"],["tcsryea","a","s"],["sainort","t","a"],["atorins","t","a"],["alsniot","a","t"],["alrncse","e","a"],["teardop","r","e"],["usirnec","e","s"],["iterdns","e","t"],["aptcsne","s","e"],["uaenmrs","e","s"],["rsnloae","e","s"],["iotalrn","t","i"]];
+(function () {
+  'use strict';
+
+  var DICT = window.__DICT__.split(' ');
+  var DICT_SET = new Set(DICT);
+  var PUZZLES = window.__PUZZLES__;
+  var MAX_WORDS = 12;
+  var VOWELS = 'aeiou';
+
+  var state = {
+    letters: [],         // 7 available letters
+    center: '',
+    bonus: '',
+    petals: [],          // 6 outer letters (order = presentation)
+    current: [],
+    found: [],
+    score: 0,
+    done: false
+  };
+
+  var el = {
+    flower: document.getElementById('flower'),
+    currentWord: document.getElementById('currentWord'),
+    feedback: document.getElementById('feedback'),
+    score: document.getElementById('scoreDisplay'),
+    progress: document.getElementById('progressDisplay'),
+    bonusBadge: document.getElementById('bonusBadge'),
+    bflies: document.getElementById('bflies'),
+    infoModal: document.getElementById('infoModal'),
+    infoBtn: document.getElementById('infoBtn'),
+    themeBtn: document.getElementById('themeBtn'),
+    infoClose: document.getElementById('infoClose'),
+    doneModal: document.getElementById('doneModal'),
+    finalScore: document.getElementById('finalScore'),
+    replayBtn: document.getElementById('replayBtn'),
+    submit: document.getElementById('submitBtn'),
+    del: document.getElementById('delBtn'),
+    clear: document.getElementById('clearBtn'),
+    shuffle: document.getElementById('shuffleBtn')
+  };
+
+  var feedbackTimer = null;
+
+  // ---------- helpers ----------
+  function shuffleArray(a) {
+    var arr = a.slice();
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  function pickRandomFrom(a) { return a[Math.floor(Math.random() * a.length)]; }
+
+  function feedback(text, kind) {
+    clearTimeout(feedbackTimer);
+    el.feedback.textContent = text || '';
+    el.feedback.className = 'shrink-0 flex min-h-[1.25rem] items-center justify-center text-center text-xs sm:text-sm font-semibold px-2 ' +
+      (kind === 'ok' ? 'text-emerald-600 dark:text-emerald-400'
+        : kind === 'warn' ? 'text-amber-600 dark:text-amber-400'
+        : 'text-rose-600 dark:text-rose-400');
+    feedbackTimer = setTimeout(function () {
+      el.feedback.textContent = '';
+      el.feedback.className = 'shrink-0 flex min-h-[1.25rem] items-center justify-center text-center text-xs sm:text-sm font-semibold px-2';
+    }, 2600);
+  }
+
+  // ---------- scoring ----------
+  function baseScore(len) {
+    if (len <= 4) return 2;
+    if (len === 5) return 4;
+    if (len === 6) return 6;
+    return 12 + 3 * (len - 7); // 7 -> 12, 8 -> 15, ...
+  }
+  function isPangram(word, letters) {
+    for (var i = 0; i < letters.length; i++) if (word.indexOf(letters[i]) === -1) return false;
+    return true;
+  }
+  function wordScore(word) {
+    var s = baseScore(word.length);
+    for (var i = 0; i < word.length; i++) if (word[i] === state.bonus) s += 5;
+    if (isPangram(word, state.letters)) s += 7;
+    return s;
+  }
+
+  // ---------- puzzle ----------
+  function nextPuzzle() {
+    var used = state.letters.join('');
+    var available = PUZZLES.filter(function (p) { return p[0] !== used; });
+    var pool = available.length ? available : PUZZLES;
+    var p = pickRandomFrom(pool);
+    state.letters = p[0].split('');
+    state.center = p[1];
+    state.bonus = p[2];
+    state.petals = state.letters.filter(function (l) { return l !== state.center; });
+    state.petals = shuffleArray(state.petals);
+  }
+
+  function newGame() {
+    state.current = [];
+    state.found = [];
+    state.score = 0;
+    state.done = false;
+    nextPuzzle();
+    hideModal(el.doneModal);
+    renderAll();      // builds the flower first so slots see real geometry
+    petalBloom();     // fresh petals unfurl from behind the center letter
+    buildButterflies();
+    renderBflies(false);
+    // layout can settle a moment later (feedback text, font swap): rebuild once more
+    setTimeout(function () { buildButterflies(); renderBflies(false); }, 400);
+    feedback('A new flower bloomed. Good luck!', 'ok');
+  }
+
+  // ---------- flower rendering ----------
+  function buildFlower() {
+    el.flower.innerHTML = '';
+    var wrap = document.getElementById('flowerWrap');
+    var maxW = wrap.clientWidth;
+    var maxH = wrap.clientHeight;
+    var size = Math.max(120, Math.min(maxW, maxH));
+    el.flower.style.width = size + 'px';
+    el.flower.style.height = size + 'px';
+    var cx = size / 2, cy = size / 2;
+    var petalW = size * 0.32;      // petal box width
+    var petalH = size * 0.38;      // petal box height (taller than wide)
+    var centerD = size * 0.30;     // center diameter
+    var ring = size * 0.27;        // center to petal-box-center distance
+    var fs = Math.max(17, Math.round(size * 0.115)); // letter font size
+
+    // center circle: domed cushion with rim shading
+    var c = document.createElement('button');
+    c.type = 'button';
+    c.setAttribute('aria-label', 'Center letter ' + state.center.toUpperCase());
+    c.className = state.center === state.bonus
+      ? 'absolute z-20 rounded-full font-extrabold text-white flex items-center justify-center border-4 border-yellow-400 ring-4 ring-yellow-300/60 shadow-lg hover:scale-105 active:scale-95 transition focus-visible:outline-none focus-visible:ring-8 focus-visible:ring-yellow-300'
+      : 'absolute z-20 rounded-full font-extrabold text-white flex items-center justify-center border-4 border-white/40 shadow-lg hover:scale-105 active:scale-95 transition focus-visible:outline-none focus-visible:ring-8 focus-visible:ring-purple-300';
+    c.style.background = 'radial-gradient(circle at 33% 28%, rgba(255,255,255,.42), rgba(255,255,255,0) 46%), radial-gradient(circle at 50% 42%, #c4b5fd 0%, #8b5cf6 55%, #6d28d9 100%)';
+    c.style.boxShadow = 'inset 0 3px 8px rgba(255,255,255,.3), inset 0 -6px 12px rgba(46,16,101,.55), inset 0 0 0 3px rgba(255,255,255,.08), 0 6px 16px rgba(76,29,149,.35)';
+    c.style.width = centerD + 'px';
+    c.style.height = centerD + 'px';
+    c.style.left = (cx - centerD / 2) + 'px';
+    c.style.top = (cy - centerD / 2) + 'px';
+    c.style.fontSize = fs + 'px';
+    c.textContent = state.center.toUpperCase();
+    c.addEventListener('click', function () { addLetter(state.center); });
+    el.flower.appendChild(c);
+
+    // 6 SVG petals in a ring, tips pointing outward
+    var PETAL_D = 'M50,126 C36,106 16,88 12,60 C8,32 24,8 50,4 C76,8 92,32 88,60 C84,88 64,106 50,126 Z';
+    var SVGNS = 'http://www.w3.org/2000/svg';
+    for (var k = 0; k < 6; k++) {
+      var letter = state.petals[k];
+      var ang = (-90 + k * 60) * Math.PI / 180;
+      var deg = k * 60;
+      var px = cx + ring * Math.cos(ang) - petalW / 2;
+      var py = cy + ring * Math.sin(ang) - petalH / 2;
+      var isBonus = letter === state.bonus;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', 'Petal letter ' + letter.toUpperCase() + (isBonus ? ' (bonus)' : ''));
+      b.className = 'petal-btn absolute z-10 rounded-full focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-400' + (state.done ? ' opacity-60' : '');
+      b.style.setProperty('--r', deg + 'deg');
+      b.style.width = petalW + 'px';
+      b.style.height = petalH + 'px';
+      b.style.left = px + 'px';
+      b.style.top = py + 'px';
+
+      var svg = document.createElementNS(SVGNS, 'svg');
+      svg.setAttribute('viewBox', '0 0 100 130');
+      svg.setAttribute('class', 'petal-svg absolute inset-0 w-full h-full');
+      svg.setAttribute('aria-hidden', 'true');
+      var path = document.createElementNS(SVGNS, 'path');
+      path.setAttribute('d', PETAL_D);
+      path.setAttribute('fill', 'url(#petalGrad)');
+      path.setAttribute('stroke', 'url(#petalEdge)');
+      path.setAttribute('class', 'petal-stroke' + (isBonus ? ' bonus' : ''));
+      svg.appendChild(path);
+      // deep rosy shading pooling at the base
+      var shade = document.createElementNS(SVGNS, 'path');
+      shade.setAttribute('d', PETAL_D);
+      shade.setAttribute('fill', 'url(#petalBase)');
+      svg.appendChild(shade);
+      // soft light falling on the upper petal
+      var sheen = document.createElementNS(SVGNS, 'path');
+      sheen.setAttribute('d', PETAL_D);
+      sheen.setAttribute('fill', 'url(#petalSheen)');
+      svg.appendChild(sheen);
+      // layered inner petal (lighter, inset)
+      var inner = document.createElementNS(SVGNS, 'path');
+      inner.setAttribute('d', PETAL_D);
+      inner.setAttribute('transform', 'translate(12.5 16) scale(0.75)');
+      inner.setAttribute('fill', 'rgba(255,255,255,.24)');
+      svg.appendChild(inner);
+      // gentle ruffle ripple near the tip
+      var ruffle = document.createElementNS(SVGNS, 'path');
+      ruffle.setAttribute('d', 'M26,42 C34,34 42,38 50,30 C58,38 66,34 74,42');
+      ruffle.setAttribute('fill', 'none');
+      ruffle.setAttribute('stroke', 'rgba(255,255,255,.35)');
+      ruffle.setAttribute('stroke-width', 1.6);
+      ruffle.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(ruffle);
+      var veins = [
+        ['M50,118 C48,95 48,60 50,14', 2.5, 0.32],
+        ['M50,108 C40,90 33,75 29,55', 1.8, 0.26],
+        ['M50,108 C60,90 67,75 71,55', 1.8, 0.26],
+        ['M50,100 C28,84 20,68 17,50', 1.3, 0.18],
+        ['M50,100 C72,84 80,68 83,50', 1.3, 0.18],
+        ['M50,92 C42,84 36,76 33,68', 1.1, 0.14],
+        ['M50,92 C58,84 64,76 67,68', 1.1, 0.14],
+        ['M50,88 C44,72 40,58 38,44', 1.0, 0.12],
+        ['M50,88 C56,72 60,58 62,44', 1.0, 0.12]
+      ];
+      for (var v = 0; v < veins.length; v++) {
+        var vp = document.createElementNS(SVGNS, 'path');
+        vp.setAttribute('d', veins[v][0]);
+        vp.setAttribute('fill', 'none');
+        vp.setAttribute('stroke', 'rgba(168,85,247,' + veins[v][2] + ')');
+        vp.setAttribute('stroke-width', veins[v][1]);
+        vp.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(vp);
+      }
+      // pollen speckles near the base
+      var speck = [[44, 104], [56, 102], [50, 112], [39, 96], [61, 96], [50, 90]];
+      for (var sp = 0; sp < speck.length; sp++) {
+        var dot = document.createElementNS(SVGNS, 'circle');
+        dot.setAttribute('cx', speck[sp][0]);
+        dot.setAttribute('cy', speck[sp][1]);
+        dot.setAttribute('r', 1.3);
+        dot.setAttribute('fill', 'rgba(126,34,206,.3)');
+        svg.appendChild(dot);
+      }
+      b.appendChild(svg);
+
+      var lt = document.createElement('span');
+      lt.className = 'petal-letter absolute font-extrabold text-purple-900 leading-none';
+      lt.style.fontSize = fs + 'px';
+      lt.textContent = letter.toUpperCase();
+      b.appendChild(lt);
+
+      b.addEventListener('click', function (lg) { return function () { addLetter(lg); }; }(letter));
+      el.flower.appendChild(b);
+    }
+  }
+
+  // ---------- petal animations (shuffle / new bloom) ----------
+  var REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function petalFall(done) {
+    if (REDUCED_MOTION) { done(); return; }
+    var petals = el.flower.querySelectorAll('.petal-btn');
+    var fall = Math.round(el.flower.clientHeight * 0.95 + 40);
+    var anims = [];
+    for (var i = 0; i < petals.length; i++) {
+      var b = petals[i];
+      var ang = parseFloat(b.style.getPropertyValue('--r')) || 0;
+      var dir = (i % 2 ? 1 : -1);
+      var sway = dir * (20 + (i % 3) * 9);
+      var spin = dir * (26 + (i % 3) * 16);
+      var tilt = dir * 14;
+      var kf = function (x, y, a, s, o) {
+        return { transform: 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px) rotate(' + Math.round(a) + 'deg) scale(' + s + ')', opacity: o };
+      };
+      // detach, then flutter side to side like a falling leaf while gravity
+      // accelerates the drop; each petal spins and drifts its own way
+      anims.push(b.animate([
+        Object.assign(kf(0, 0, ang, 1, 1), { easing: 'ease-out' }),
+        kf(sway, fall * .18, ang + tilt, 1.05, 1),
+        kf(-sway * .8, fall * .46, ang - tilt * .9, 1, .96),
+        kf(sway * .9, fall * .74, ang + tilt * .6, .9, .7),
+        kf(sway * 1.25, fall, ang + spin, .78, 0)
+      ], { duration: 760, delay: i * 45, easing: 'ease-in', fill: 'forwards' }));
+    }
+    if (!anims.length) { done(); return; }
+    Promise.all(anims.map(function (a) { return a.finished.catch(function () {}); })).then(done, done);
+  }
+
+  function centerPulse() {
+    var c = el.flower.querySelector('button[aria-label^="Center letter"]');
+    if (!c || REDUCED_MOTION) return;
+    c.animate([
+      { transform: 'scale(1)', easing: 'ease-out' },
+      { transform: 'scale(1.1)', offset: .3 },
+      { transform: 'scale(.97)', offset: .62 },
+      { transform: 'scale(1)' }
+    ], { duration: 680, easing: 'ease-in-out' });
+  }
+
+  function petalBloom() {
+    if (REDUCED_MOTION) return;
+    centerPulse();
+    var petals = el.flower.querySelectorAll('.petal-btn');
+    var size = el.flower.clientWidth;
+    var cx = size / 2, cy = size / 2;
+    for (var i = 0; i < petals.length; i++) {
+      var b = petals[i];
+      var bx = parseFloat(b.style.left) + parseFloat(b.style.width) / 2;
+      var by = parseFloat(b.style.top) + parseFloat(b.style.height) / 2;
+      var dx = Math.round(cx - bx), dy = Math.round(cy - by);
+      var ang = parseFloat(b.style.getPropertyValue('--r')) || 0;
+      var dir = (i % 2 ? 1 : -1);
+      var delay = 90 + i * 55;
+      // one continuous spring over the whole journey: translate, unfurl
+      // rotation and scale all follow the same smooth curve and overshoot
+      // together. fill:'backwards' holds the hidden start state through the
+      // stagger delay so no petal flashes at its final spot first.
+      // petals are z-10 under the center disc (z-20), so the start state
+      // tucks them behind the center letter.
+      b.animate([
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (ang + dir * 46) + 'deg) scale(.12)' },
+        { transform: 'translate(0,0) rotate(' + ang + 'deg) scale(1)' }
+      ], { duration: 560, delay: delay, easing: 'cubic-bezier(.28,1.3,.4,1)', fill: 'backwards' });
+      b.animate([
+        { opacity: 0 },
+        { opacity: 1 }
+      ], { duration: 190, delay: delay, easing: 'ease-out', fill: 'backwards' });
+    }
+  }
+
+  // ---------- current word ----------
+  function renderCurrent() {
+    el.currentWord.innerHTML = '';
+    state.current.forEach(function (l, i) {
+      var chip = document.createElement('span');
+      chip.className = 'flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-purple-600 text-white font-extrabold text-base sm:text-lg shadow-sm';
+      chip.textContent = l.toUpperCase();
+      el.currentWord.appendChild(chip);
+    });
+    if (state.current.length === 0) {
+      var ph = document.createElement('span');
+      ph.className = 'italic text-xs sm:text-sm uppercase tracking-wider text-purple-500 dark:text-purple-300/80';
+      ph.textContent = 'Tap letters or type on keyboard…';
+      el.currentWord.appendChild(ph);
+    } else {
+      var caret = document.createElement('span');
+      caret.className = 'h-8 sm:h-9 w-0.5 bg-purple-300 dark:bg-purple-600';
+      el.currentWord.appendChild(caret);
+    }
+    el.submit.disabled = state.current.length === 0 || state.done;
+  }
+
+  function addLetter(l) {
+    if (state.done) return;
+    if (state.letters.indexOf(l) === -1) { feedback('Letters not available on this flower.', 'err'); return; }
+    state.current.push(l);
+    renderCurrent();
+  }
+  function deleteLast() {
+    if (state.current.length) state.current.pop();
+    renderCurrent();
+  }
+  function clearWord() {
+    state.current = [];
+    renderCurrent();
+  }
+
+  // ---------- submit ----------
+  function submit() {
+    if (state.done) return;
+    var word = state.current.join('');
+    if (word.length < 4) { feedback('Too short — need at least 4 letters.', 'err'); return; }
+    if (word.indexOf(state.center) === -1) { feedback('Include the center letter.', 'warn'); return; }
+    for (var i = 0; i < word.length; i++) {
+      if (state.letters.indexOf(word[i]) === -1) { feedback('Letters not available on this flower.', 'err'); return; }
+    }
+    if (!DICT_SET.has(word)) { feedback('Word not found.', 'err'); return; }
+    if (state.found.indexOf(word) !== -1) { feedback('Already submitted.', 'err'); return; }
+
+    var pts = wordScore(word);
+    state.found.push(word);
+    state.score += pts;
+    state.current = [];
+    var pan = isPangram(word, state.letters);
+    renderAll();
+    feedback(pan ? 'Pangram! +' + pts : word.toUpperCase() + ' +' + pts, 'ok');
+
+    if (state.found.length >= MAX_WORDS) {
+      setTimeout(showComplete, 650);
+    }
+  }
+
+  // ---------- collected-word butterflies ----------
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var bflySlots = [];      // parking spots: {x, y, w, rot, bow}
+  var bflyEls = [];        // butterfly <g> per found-word index
+  var bflyFlights = [];    // active rAF flights
+  var BF_FOREWING = 'M4 0 C14 -16 36 -21 47 -12 C55 -5 54 3 45 5 C33 9 15 8 4 2 Z';
+  var BF_HINDWING = 'M4 2 C16 4 30 9 35 16 C38 23 29 28 20 23 C11 18 5 10 4 4 Z';
+  var BF_COLS = [
+    ['#fbcfe8', '#f472b6'],
+    ['#ddd6fe', '#a78bfa'],
+    ['#99f6e4', '#2dd4bf']
+  ];
+
+  function svgEl(tag, attrs, parent) {
+    var node = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) if (attrs[k] != null) node.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(node);
+    return node;
+  }
+  function relBox(node, inflate) {
+    var g = document.getElementById('game').getBoundingClientRect();
+    var r = node.getBoundingClientRect();
+    return { x: r.left - g.left - inflate, y: r.top - g.top - inflate, w: r.width + inflate * 2, h: r.height + inflate * 2 };
+  }
+  function relContentBox(node, inflate) {
+    var g = document.getElementById('game').getBoundingClientRect();
+    var x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (var i = 0; i < node.children.length; i++) {
+      var r = node.children[i].getBoundingClientRect();
+      x1 = Math.min(x1, r.left - g.left); y1 = Math.min(y1, r.top - g.top);
+      x2 = Math.max(x2, r.right - g.left); y2 = Math.max(y2, r.bottom - g.top);
+    }
+    if (x1 === Infinity) return relBox(node, inflate);
+    return { x: x1 - inflate, y: y1 - inflate, w: x2 - x1 + inflate * 2, h: y2 - y1 + inflate * 2 };
+  }
+  function centeredBox(node, inflate, maxW) {
+    var b = relBox(node, 0);
+    var w = Math.min(b.w, maxW);
+    return { x: b.x + (b.w - w) / 2 - inflate, y: b.y - inflate, w: w + inflate * 2, h: b.h + inflate * 2 };
+  }
+  function measureText(node) {
+    var rng = document.createRange();
+    rng.selectNodeContents(node);
+    return rng.getBoundingClientRect().width;
+  }
+  // rotated-rect SAT
+  function rectCorners(r) {
+    var c = Math.cos(r.a), sn = Math.sin(r.a);
+    var ex = r.hw * c, ey = r.hw * sn, wx = r.hh * -sn, wy = r.hh * c;
+    return [
+      { x: r.cx + ex + wx, y: r.cy + ey + wy },
+      { x: r.cx + ex - wx, y: r.cy + ey - wy },
+      { x: r.cx - ex - wx, y: r.cy - ey - wy },
+      { x: r.cx - ex + wx, y: r.cy - ey + wy }
+    ];
+  }
+  function proj(pts, dx, dy) {
+    var mn = Infinity, mx = -Infinity;
+    pts.forEach(function (v) { var d = v.x * dx + v.y * dy; if (d < mn) mn = d; if (d > mx) mx = d; });
+    return [mn, mx];
+  }
+  function rectsSep(A, B) {
+    var ca = rectCorners(A), cb = rectCorners(B);
+    var axes = [
+      [ca[1].x - ca[0].x, ca[1].y - ca[0].y], [ca[3].x - ca[0].x, ca[3].y - ca[0].y],
+      [cb[1].x - cb[0].x, cb[1].y - cb[0].y], [cb[3].x - cb[0].x, cb[3].y - cb[0].y]
+    ];
+    for (var i = 0; i < axes.length; i++) {
+      var pa = proj(ca, axes[i][0], axes[i][1]), pb = proj(cb, axes[i][0], axes[i][1]);
+      if (pa[1] <= pb[0] + 1 || pb[1] <= pa[0] + 1) return true;
+    }
+    return false;
+  }
+  function boxToRect(b) {
+    return { cx: b.x + b.w / 2, cy: b.y + b.h / 2, hw: b.w / 2, hh: b.h / 2, a: 0 };
+  }
+  function bflyRect(s) {
+    var k = s.w / 100;
+    var halfW = 0.55 * s.w;      // wings
+    var halfH = 0.31 * s.w + 10; // wings + points text + antennae
+    var rad = Math.abs(s.rot || 0) * Math.PI / 180;
+    return {
+      cx: s.x, cy: s.y, a: 0,
+      hw: halfW * Math.cos(rad) + halfH * Math.sin(rad) + 4,
+      hh: halfH * Math.cos(rad) + halfW * Math.sin(rad) + 4
+    };
+  }
+
+  // Parking spots in the free background. Wide screens: columns flanking the
+  // flower + a row above + bottom corners. Narrow screens: a row of five in
+  // the bands above and below the flower + an edge pair by the feedback line.
+  // Butterflies in the same row may sit wing-to-wing (swarm look), so the
+  // mutual-separation check is skipped between same-row neighbours.
+  function computeBflySlots(W, H) {
+    var flower = relBox(document.getElementById('flower'), 10);
+    var blockers = [
+      flower,
+      relBox(document.getElementById('gameStats'), 5),
+      relBox(el.currentWord, 5),
+      centeredBox(el.feedback, 8, Math.max(130, measureText(el.feedback) + 16)),
+      relContentBox(document.getElementById('controlsRow'), 6)
+    ];
+    var wide = flower.x - 20 >= 110;
+    var L = wide ? Math.round(Math.max(70, Math.min(124, W * 0.095)))
+                 : Math.round(Math.max(54, Math.min(92, (W - 16) / 6.4)));
+    var cand = [];
+    function free(s) {
+      var r = bflyRect(s);
+      var cs = rectCorners(r);
+      for (var i = 0; i < cs.length; i++) {
+        if (cs[i].x < 4 || cs[i].x > W - 4 || cs[i].y < 52 || cs[i].y > H - 8) return false;
+      }
+      for (var j = 0; j < blockers.length; j++) if (!rectsSep(r, boxToRect(blockers[j]))) return false;
+      return true;
+    }
+    function rowCells(y, edgeOnly) {
+      if (edgeOnly) {
+        var ehw = 0.55 * L + 4;
+        cand.push({ x: Math.round(10 + ehw), y: Math.round(y), w: L, rot: 0, row: true });
+        cand.push({ x: Math.round(W - 10 - ehw), y: Math.round(y), w: L, rot: 0, row: true });
+        return;
+      }
+      var per = Math.max(1, Math.floor((W - 16) / (L + 8)));
+      var lead = 8 + (W - 16 - (per * (L + 8) - 8)) / 2 + L / 2;
+      for (var c = 0; c < per; c++) {
+        cand.push({ x: Math.round(lead + c * (L + 8)), y: Math.round(y), w: L, rot: (c % 2 ? 4 : -4), row: true });
+      }
+    }
+    if (wide) {
+      var hw = 0.55 * L + 4;
+      var xs = [
+        { x: flower.x - 14 - hw, col: 'L' },
+        { x: flower.x + flower.w + 14 + hw, col: 'R' }
+      ];
+      var fs = [0.14, 0.32, 0.50, 0.68, 0.86];
+      for (var j = 0; j < fs.length; j++) {
+        xs.forEach(function (sd) {
+          cand.push({
+            x: Math.round(sd.x), y: Math.round(Math.min(H - 55, Math.max(60, flower.y + flower.h * fs[j]))),
+            w: L, rot: 0, col: sd.col
+          });
+        });
+      }
+      rowCells(flower.y - 18 - 26);
+      rowCells(flower.y - 18 - 26 - 62, true);
+    } else {
+      // swarm rows: butterflies sit wing-to-wing; only UI blockers matter
+      rowCells(flower.y - 16 - 26);
+      rowCells(flower.y + flower.h + 36);
+      rowCells(flower.y + flower.h + 36 + Math.round(0.62 * L + 22), true);
+    }
+    // bottom corners beside the controls
+    var by0 = flower.y + flower.h + 18 + 26;
+    for (var r = 0; r < 3; r++) {
+      var by = by0 + r * 56;
+      cand.push({ x: Math.round(14 + 0.55 * L), y: Math.round(by), w: L, rot: 8 });
+      cand.push({ x: Math.round(W - 14 - 0.55 * L), y: Math.round(by), w: L, rot: -8 });
+    }
+    var kept = [];
+    cand.forEach(function (s) {
+      if (!free(s)) return;
+      if (wide) {
+        for (var i = 0; i < kept.length; i++) {
+          if (s.row && kept[i].row && Math.abs(kept[i].y - s.y) < 15) continue;
+          if (s.col && kept[i].col === s.col) continue;
+          if (!rectsSep(bflyRect(s), bflyRect(kept[i]))) return;
+        }
+      } else {
+        // swarm: same-row neighbours may sit wing-to-wing, but nothing may
+        // stack — reject a candidate whose x-range overlaps a kept slot while
+        // sitting too close vertically (corner rows duplicate the swarm rows)
+        for (var j = 0; j < kept.length; j++) {
+          if (Math.abs(kept[j].x - s.x) < L * 1.05 && Math.abs(kept[j].y - s.y) < 0.62 * L + 16) return;
+        }
+      }
+      kept.push(s);
+    });
+    return kept.slice(0, MAX_WORDS);
+  }
+
+  function makeButterfly(word, s, idx) {
+    var pan = isPangram(word, state.letters);
+    var col = pan ? ['#fde68a', '#f59e0b'] : BF_COLS[idx % 3];
+    var L = s.w;
+    var k = L / 100;
+    var g = svgEl('g', { transform: 'translate(' + s.x + ' ' + s.y + ') rotate(' + (s.rot || 0) + ')' });
+    var bob = svgEl('g', { 'class': 'bfly-bob' }, g);
+    var scale = svgEl('g', { 'class': 'bfly-in' }, bob);
+    var flap = svgEl('g', { 'class': 'bfly-wings' }, scale);
+    [-1, 1].forEach(function (sd) {
+      var wg = svgEl('g', { transform: 'scale(' + (sd * k) + ' ' + k + ')' }, flap);
+      svgEl('path', { d: BF_FOREWING, fill: col[0], stroke: col[1], 'stroke-width': 1.5 / k, 'stroke-linejoin': 'round' }, wg);
+      svgEl('path', { d: BF_HINDWING, fill: col[0], stroke: col[1], 'stroke-width': 1.5 / k, 'stroke-linejoin': 'round', opacity: 0.92 }, wg);
+      // wing details: inner accent line + contrasting spots
+      svgEl('path', {
+        d: 'M8 -2 C18 -14 34 -17 43 -9', fill: 'none', stroke: col[1],
+        'stroke-width': 1 / k, 'stroke-linecap': 'round', opacity: 0.4
+      }, wg);
+      svgEl('path', {
+        d: 'M10 6 C18 8 27 11 31 16', fill: 'none', stroke: col[1],
+        'stroke-width': 0.9 / k, 'stroke-linecap': 'round', opacity: 0.32
+      }, wg);
+      svgEl('circle', { cx: 36, cy: -11, r: 4.5, fill: 'rgba(255,255,255,.6)', stroke: col[1], 'stroke-width': 0.8 / k }, wg);
+      svgEl('circle', { cx: 22, cy: -7, r: 2.8, fill: 'rgba(255,255,255,.5)' }, wg);
+      svgEl('circle', { cx: 24, cy: 15, r: 3.4, fill: 'rgba(255,255,255,.55)', stroke: col[1], 'stroke-width': 0.7 / k }, wg);
+      svgEl('circle', { cx: 30, cy: 19, r: 1.8, fill: 'rgba(255,255,255,.45)' }, wg);
+    });
+    svgEl('ellipse', { cx: 0, cy: 2, rx: 3.2, ry: 10, fill: '#4c1d95' }, scale);
+    svgEl('path', {
+      d: 'M-2 -7 C-5 -13 -9 -15 -11 -14 M2 -7 C5 -13 9 -15 11 -14',
+      fill: 'none', stroke: '#4c1d95', 'stroke-width': 1.2, 'stroke-linecap': 'round'
+    }, scale);
+    var fs = Math.max(13, Math.min(20, Math.round(L * 0.175)));
+    var label = word.toUpperCase() + (pan ? ' ★' : '');
+    var t = svgEl('text', {
+      x: 0, y: Math.round(fs * 0.36), 'text-anchor': 'middle', 'font-size': fs, 'font-weight': 800,
+      'class': 'bfly-word' + (pan ? ' bfly-word-gold' : '')
+    }, scale);
+    t.textContent = label;
+    if (label.length * fs * 0.62 > L * 0.84) {
+      t.setAttribute('textLength', Math.round(L * 0.84));
+      t.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+    }
+    var p = svgEl('text', {
+      x: 0, y: Math.round(fs * 0.36 + fs * 0.95), 'text-anchor': 'middle',
+      'font-size': Math.max(8, Math.round(fs * 0.6)), 'font-weight': 700,
+      'class': 'bfly-pts' + (pan ? ' bfly-pts-gold' : '')
+    }, scale);
+    p.textContent = '+' + wordScore(word);
+    if (pan) g.classList.add('bfly-gold');
+    return g;
+  }
+
+  // fly along a curved path with a flutter, then park
+  function flyButterfly(g, from, s, dur) {
+    var dx = s.x - from.x, dy = s.y - from.y;
+    var len = Math.hypot(dx, dy) || 1;
+    var px = -dy / len, py = dx / len;
+    var bow = (s.bow || 1) * Math.min(95, len * 0.3);
+    var cx = (from.x + s.x) / 2 + px * bow;
+    var cy = (from.y + s.y) / 2 + py * bow;
+    var t0 = null;
+    var flight = { g: g, cancel: false };
+    bflyFlights.push(flight);
+    var finished = false;
+    function finish() {
+      if (finished || flight.cancel) return;
+      finished = true;
+      g.setAttribute('transform', 'translate(' + s.x + ' ' + s.y + ') rotate(' + (s.rot || 0) + ')');
+      g.classList.add('parked');
+    }
+    // safety: park even if rAF stalls (occluded pane)
+    var guard = setTimeout(finish, dur + 900);
+    function frame(now) {
+      if (flight.cancel) { clearTimeout(guard); return; }
+      if (t0 === null) t0 = now;
+      var t = Math.min(1, (now - t0) / dur);
+      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      var u = 1 - e;
+      var x = u * u * from.x + 2 * u * e * cx + e * e * s.x;
+      var y = u * u * from.y + 2 * u * e * cy + e * e * s.y + Math.sin(t * Math.PI * 5) * 6;
+      var nx = 2 * u * (cx - from.x) + 2 * e * (s.x - cx);
+      var ny = 2 * u * (cy - from.y) + 2 * e * (s.y - cy);
+      var ang = Math.atan2(ny, nx) * 180 / Math.PI;
+      if (ang > 90) ang -= 180;
+      if (ang < -90) ang += 180;
+      var tilt = Math.max(-22, Math.min(22, ang * 0.45));
+      g.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + tilt.toFixed(1) + ')');
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        clearTimeout(guard);
+        finish();
+      }
+    }
+    g.setAttribute('transform', 'translate(' + from.x + ' ' + from.y + ') rotate(0)');
+    requestAnimationFrame(frame);
+  }
+
+  function buildButterflies() {
+    bflyFlights.forEach(function (f) { f.cancel = true; });
+    bflyFlights = [];
+    var svg = el.bflies;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    bflyEls = [];
+    var W = svg.clientWidth, H = svg.clientHeight;
+    if (W < 60 || H < 60) { bflySlots = []; return; }
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    bflySlots = computeBflySlots(W, H);
+    svgEl('g', { id: 'bflyLayer' }, svg);
+  }
+
+  function renderBflies(animate) {
+    el.bflies.setAttribute('aria-label', state.found.length + ' of ' + MAX_WORDS + ' words collected');
+    var layer = el.bflies.querySelector('#bflyLayer');
+    if (!layer) return;
+    for (var i = 0; i < state.found.length && i < bflySlots.length; i++) {
+      if (bflyEls[i]) continue;
+      var s = bflySlots[i];
+      s.bow = (i % 2 ? 1 : -1);
+      var g = makeButterfly(state.found[i], s, i);
+      layer.appendChild(g);
+      bflyEls[i] = g;
+      if (animate) {
+        var fl = document.getElementById('flower').getBoundingClientRect();
+        var gm = document.getElementById('game').getBoundingClientRect();
+        flyButterfly(g, { x: fl.left + fl.width / 2 - gm.left, y: fl.top + fl.height / 2 - gm.top }, s, 1500);
+      } else {
+        g.classList.add('parked');
+      }
+    }
+  }
+
+  // ---------- render all ----------
+  function renderAll() {
+    renderCurrent();
+    buildFlower();
+    el.score.textContent = state.score;
+    el.progress.textContent = state.found.length;
+    el.bonusBadge.textContent = state.bonus.toUpperCase();
+
+    renderBflies(true);
+    el.shuffle.disabled = state.done;
+  }
+
+  // ---------- modals ----------
+  function showModal(m) { m.classList.remove('hidden'); m.classList.add('flex'); }
+  function hideModal(m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+
+  function showComplete() {
+    state.done = true;
+    el.finalScore.textContent = state.score;
+    showModal(el.doneModal);
+    renderAll();
+  }
+
+  // ---------- events ----------
+  el.submit.addEventListener('click', submit);
+  el.del.addEventListener('click', deleteLast);
+  el.clear.addEventListener('click', clearWord);
+  var shuffling = false;
+  el.shuffle.addEventListener('click', function () {
+    if (shuffling || state.done) return;
+    shuffling = true;
+    el.shuffle.disabled = true;
+    petalFall(function () {
+      state.petals = shuffleArray(state.petals);
+      buildFlower();
+      petalBloom();
+      shuffling = false;
+      el.shuffle.disabled = state.done;
+    });
+  });
+  el.infoBtn.addEventListener('click', function () { showModal(el.infoModal); });
+  el.infoClose.addEventListener('click', function () { hideModal(el.infoModal); });
+  el.infoModal.addEventListener('click', function (e) { if (e.target === el.infoModal) hideModal(el.infoModal); });
+  el.replayBtn.addEventListener('click', newGame);
+
+  // ---------- theme toggle ----------
+  var themeIcon = document.getElementById('themeIcon');
+  function syncThemeIcon() {
+    themeIcon.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+  }
+  syncThemeIcon();
+  el.themeBtn.addEventListener('click', function () {
+    var dark = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    try { localStorage.setItem('blossom-theme', dark ? 'dark' : 'light'); } catch (e) {}
+    syncThemeIcon();
+  });
+
+  // keyboard: letters / backspace / enter
+  window.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Enter' && (e.target.tagName === 'BUTTON' || e.target.tagName === 'A')) return;
+    var k = e.key;
+    if (/^[a-zA-Z]$/.test(k)) {
+      addLetter(k.toLowerCase());
+    } else if (k === 'Backspace') {
+      deleteLast();
+    } else if (k === 'Enter') {
+      submit();
+    }
+  });
+
+  // keep flower scaled to its box (matters after modal open / resize)
+  var resizeT = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(function () {
+      if (!state.done) buildFlower();
+      buildButterflies();
+      renderBflies(false);
+    }, 150);
+  });
+  new ResizeObserver(function () {
+    buildFlower();
+    buildButterflies();
+    renderBflies(false);
+  }).observe(document.getElementById('flowerWrap'));
+
+  newGame();
+})();
+</script>
+</body>
+</html>
