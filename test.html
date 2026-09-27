@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Speaking & Language App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        @keyframes pulse-wave {
+            0%, 100% { transform: scaleY(0.4); }
+            50% { transform: scaleY(1); }
+        }
+        .pq-audio-wave span {
+            animation: pulse-wave 1.2s ease-in-out infinite;
+        }
+        .pq-audio-wave span:nth-child(2) { animation-delay: 0.2s; }
+        .pq-audio-wave span:nth-child(3) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body class="m-0 min-h-[100dvh] overflow-x-hidden bg-[radial-gradient(circle_at_12%_14%,rgba(111,84,245,0.12),transparent_28%),linear-gradient(180deg,#ffffff_0%,#fbfaff_58%,#ffffff_100%)] font-sans text-[#11182f] dark:bg-[#090f1c] dark:text-[#eef2ff] transition-colors duration-300">
+
+    <main class="mx-auto flex min-h-[100dvh] w-full max-w-[860px] flex-col items-center justify-around gap-[clamp(14px,2.5vh,22px)] px-2 pb-[calc(88px+env(safe-area-inset-bottom))] pt-3 dark:bg-[radial-gradient(circle_at_12%_0%,rgba(37,99,235,0.16),transparent_34%),linear-gradient(180deg,#0b1220_0%,#090f1c_100%)] dark:text-[#eef2ff] min-[421px]:pb-[calc(108px+env(safe-area-inset-bottom))] min-[681px]:px-[clamp(18px,5vw,64px)] min-[681px]:!max-w-[min(100%,1120px)] min-[681px]:!gap-[clamp(10px,1.4dvh,16px)] min-[681px]:!px-[clamp(18px,3vw,34px)] min-[681px]:!pb-[calc(98px+env(safe-area-inset-bottom))] min-[1280px]:!ml-[340px] min-[1280px]:!mr-0 min-[1280px]:!w-[calc(100%-340px)] min-[1280px]:!max-w-none min-[1280px]:!gap-3 min-[1280px]:!pb-[24px] min-[1280px]:!pl-[clamp(24px,3vw,42px)] min-[1280px]:!pr-[clamp(18px,3vw,34px)] min-[681px]:!pt-[10px]" data-speaking-app="">
+        
+        <!-- Theme Toggle Bar -->
+        <div class="w-full max-w-[900px] flex justify-end px-2">
+            <button id="themeToggle" type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-xs font-bold shadow-sm hover:bg-violet-50 dark:hover:bg-slate-700 transition cursor-pointer">
+                <svg id="sunIcon" class="w-4 h-4 text-amber-500 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                <svg id="moonIcon" class="w-4 h-4 text-indigo-600 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <span id="themeLabel">Dark Mode</span>
+            </button>
+        </div>
+
+        <header class="flex w-full items-start justify-start self-stretch min-[681px]:self-auto">
+            <div class="flex w-full max-w-full shrink-0 items-center gap-1.5 rounded-none border-0 border-[#e5ddff] bg-transparent px-1.5 py-1 shadow-none dark:border-slate-700 min-[461px]:gap-2 min-[461px]:px-2.5 min-[681px]:!mx-auto min-[681px]:!w-[min(100%,900px)] min-[681px]:!items-center min-[681px]:!gap-[clamp(14px,2.2vw,24px)] min-[681px]:!rounded-[28px] min-[681px]:!border min-[681px]:!bg-white/95 min-[681px]:dark:!bg-[#111827]/95 min-[681px]:!px-[clamp(14px,2.4vw,22px)] min-[681px]:!py-[clamp(12px,2vw,18px)] min-[681px]:!shadow-[0_14px_34px_rgba(52,38,143,0.12)] min-[681px]:dark:!shadow-[0_14px_34px_rgba(0,0,0,0.28)] min-[681px]:!py-[10px]" data-speaker-header-row="">
+                
+                <!-- Speaker Frame & Countdown SVG Ring -->
+                <div class="relative aspect-square w-[clamp(68px,17vw,96px)] shrink-0 min-[461px]:w-[clamp(76px,17vw,102px)] min-[681px]:!w-[clamp(88px,10vw,112px)]" aria-live="polite" data-speaker-frame="">
+                    <img class="relative z-[1] block h-full w-full rounded-full border-[5px] border-white bg-[#f7f5ff] object-cover shadow-[0_14px_28px_rgba(42,32,148,0.16)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_14px_28px_rgba(0,0,0,0.3)] hidden" data-speaker-photo="" alt="Active speaker">
+                    <span class="relative z-[1] h-full w-full place-items-center rounded-full border-[5px] border-white bg-gradient-to-br from-[#075cff] to-[#6d55f6] text-[clamp(1.9rem,5vw,2.8rem)] font-black uppercase leading-none text-white shadow-[0_14px_28px_rgba(42,32,148,0.16)] dark:border-slate-700 dark:shadow-[0_14px_28px_rgba(0,0,0,0.3)] grid" data-speaker-initials="" aria-hidden="true" aria-label="شيماء">ST</span>
+                    
+                    <div class="pointer-events-none absolute -inset-[7px] z-[2]" aria-live="polite">
+                        <svg class="absolute inset-0 h-full w-full -rotate-90 drop-shadow-[0_8px_15px_rgba(63,55,222,0.14)]" viewBox="0 0 120 120" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="timerGradient" x1="0%" x2="100%" y1="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#866af7"></stop>
+                                    <stop offset="100%" stop-color="#1239ef"></stop>
+                                </linearGradient>
+                            </defs>
+                            <circle class="fill-none stroke-[#ded4fb] stroke-[8] dark:stroke-slate-700" cx="60" cy="60" r="52"></circle>
+                            <circle class="fill-none stroke-[url(#timerGradient)] stroke-[8] [stroke-linecap:round] transition-[stroke-dashoffset] duration-300 ease-linear" data-timer-ring="" cx="60" cy="60" r="52" style="stroke-dasharray: 326.726; stroke-dashoffset: 65.3451;"></circle>
+                        </svg>
+                        <div class="absolute left-1/2 top-2.5 z-[3] min-w-[78px] -translate-x-1/2 -translate-y-[52%] rounded-full border-2 border-[#ded4fb] bg-white/95 px-[9px] pb-[5px] pt-1 text-center font-black shadow-[0_8px_17px_rgba(63,55,222,0.2)] dark:border-slate-700 dark:bg-[#0f172a]/95 dark:shadow-[0_8px_17px_rgba(0,0,0,0.28)]">
+                            <strong class="block text-[clamp(0.9rem,2vw,1.18rem)] leading-none text-[#11182f] dark:text-white" data-time-left="">00:48</strong>
+                            <span class="hidden">Time Left</span>
+                        </div>
+                    </div>
+
+                    <span class="absolute bottom-0 left-1/2 z-[5] max-w-[clamp(122px,36vw,170px)] -translate-x-1/2 translate-y-[58%] truncate rounded-full border-2 border-[#ded4fb] bg-white/95 px-[14px] pb-[6px] pt-1.5 text-center text-[clamp(0.78rem,1.8vw,1.08rem)] font-black leading-none text-[#11182f] shadow-[0_8px_17px_rgba(63,55,222,0.18)] dark:border-slate-700 dark:bg-[#0f172a]/95 dark:text-white dark:shadow-[0_8px_17px_rgba(0,0,0,0.28)]" data-speaker-name-pill="" style="display: none;">شيماء</span>
+                </div>
+
+                <!-- Speaker Panel Title & Details -->
+                <div class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,max-content)] items-center gap-x-1.5 gap-y-1 min-[461px]:gap-x-2 min-[681px]:!flex-[1_1_auto] min-[681px]:!gap-x-[clamp(16px,2.4vw,28px)] min-[681px]:!gap-y-2" data-speaker-panel="">
+                    <div class="col-start-1 row-start-1 min-w-0 text-left" data-speaker-title="">
+                        <span data-speaker-title-label="" class="text-xs font-semibold text-violet-600 dark:text-violet-400 block mb-0.5">Now speaking</span>
+                        <strong class="block min-w-0 truncate text-[1.22rem] font-black leading-none text-[#101832] dark:text-white min-[461px]:text-[clamp(1.28rem,4.4vw,1.9rem)] min-[681px]:!text-[clamp(1.5rem,2.75vw,2.1rem)] min-[681px]:!leading-[1.02]" data-student-name="">شيماء</strong>
+                    </div>
+
+                    <div class="col-start-1 row-start-2 flex min-w-0 max-w-full flex-wrap items-center gap-0.5 text-[#101832] dark:text-slate-200 min-[461px]:gap-1 min-[681px]:!mt-2 min-[681px]:!max-w-full min-[681px]:!gap-[clamp(8px,1.25vw,12px)] min-[681px]:!text-[clamp(1rem,1.8vw,1.2rem)]" data-current-speaker-details="">
+                        <img class="h-3.5 w-5 shrink-0 rounded-[4px] object-cover shadow-[0_2px_5px_rgba(15,23,42,0.14)] min-[461px]:h-4 min-[461px]:w-6 min-[681px]:!h-5 min-[681px]:!w-7" alt="TR flag" data-current-flag="" src="https://flagcdn.com/w40/tr.png">
+                        <strong class="shrink-0 text-[0.76rem] font-black leading-none min-[461px]:text-[0.86rem] min-[681px]:!text-[1rem]" data-current-level="">B1</strong>
+                        <span class="h-4 w-px shrink-0 bg-[#e4def8] dark:bg-slate-700 min-[461px]:h-5 min-[681px]:!h-6" aria-hidden="true"></span>
+                        <span class="flex shrink-0 items-center gap-0.5">
+                            <svg class="h-3 w-3 shrink-0 min-[461px]:h-3.5 min-[461px]:w-3.5 min-[681px]:!h-4.5 min-[681px]:!w-4.5 text-[#f5b942]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 3h2a2 2 0 0 1 2 2v1a5 5 0 0 1-5 5h-.24A6.02 6.02 0 0 1 13 14.92V18h3a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2h3v-3.08A6.02 6.02 0 0 1 7.24 11H7a5 5 0 0 1-5-5V5a2 2 0 0 1 2-2h2V2h12v1ZM6 5H4v1a3 3 0 0 0 2.25 2.9A6.2 6.2 0 0 1 6 7.17V5Zm12 2.17c0 .6-.08 1.18-.25 1.73A3 3 0 0 0 20 6V5h-2v2.17Z"></path></svg>
+                            <strong class="shrink-0 text-[0.76rem] font-black leading-none min-[461px]:text-[0.86rem] min-[681px]:!text-[1rem]" data-current-achievements="">4</strong>
+                        </span>
+                        <span class="h-4 w-px shrink-0 bg-[#e4def8] dark:bg-slate-700 min-[461px]:h-5 min-[681px]:!h-6" aria-hidden="true"></span>
+                        <span class="flex shrink-0 items-center gap-0.5 text-[#6d55f6] dark:text-violet-300">
+                            <svg class="h-3 w-3 shrink-0 min-[461px]:h-3.5 min-[461px]:w-3.5 min-[681px]:!h-4.5 min-[681px]:!w-4.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.6 2.35a1 1 0 0 1 .38 1.08L12.1 10H18a1 1 0 0 1 .78 1.63l-8 10a1 1 0 0 1-1.76-.86L10.9 14H5a1 1 0 0 1-.78-1.63l8-10a1 1 0 0 1 1.38-.02Z"></path></svg>
+                            <strong class="shrink-0 text-[0.76rem] font-black leading-none text-[#101832] dark:text-white min-[461px]:text-[0.86rem] min-[681px]:!text-[1rem]" data-current-days="">3</strong>
+                        </span>
+                    </div>
+
+                    <!-- Participant Dots & Modal Trigger -->
+                    <div class="col-start-2 row-span-2 row-start-1 flex min-w-0 shrink items-center gap-1 border-l border-[#e4def8] pl-1.5 dark:border-slate-700 min-[461px]:gap-1.5 min-[461px]:pl-2 min-[681px]:!gap-[clamp(4px,0.9vw,9px)] min-[681px]:!pl-[clamp(18px,2.6vw,30px)]" data-student-dots="">
+                        <button type="button" onclick="switchSpeaker(0)" class="relative grid aspect-square w-[30px] place-items-center overflow-visible rounded-full border-2 border-indigo-600 bg-white p-0 text-[0.72rem] shadow-[0_8px_18px_rgba(35,30,115,0.12)] transition duration-200 dark:bg-[#111827] dark:shadow-[0_8px_18px_rgba(0,0,0,0.28)] min-[421px]:w-[34px] min-[681px]:!w-[clamp(58px,8vw,74px)] min-[681px]:!border-[3px] cursor-pointer hover:scale-105" aria-label="شيماء turn">
+                            <span class="block h-full w-full rounded-full object-cover dark:border-slate-700 grid place-items-center text-[1rem] min-[681px]:text-[1.75rem] font-black uppercase leading-none text-white" style="background: linear-gradient(135deg, #2563eb, #7c3aed)">S</span>
+                        </button>
+                        <button type="button" onclick="switchSpeaker(1)" class="relative grid aspect-square w-[30px] place-items-center overflow-visible rounded-full border-2 border-transparent bg-white p-0 text-[0.72rem] shadow-[0_8px_18px_rgba(35,30,115,0.12)] transition duration-200 dark:bg-[#111827] dark:shadow-[0_8px_18px_rgba(0,0,0,0.28)] min-[421px]:w-[34px] min-[681px]:!w-[clamp(58px,8vw,74px)] min-[681px]:!border-[3px] cursor-pointer hover:scale-105" aria-label="ikhlas turn">
+                            <img class="block h-full w-full rounded-full object-cover dark:border-slate-700" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="ikhlas">
+                        </button>
+                        <button type="button" id="showParticipantsBtn" class="relative grid aspect-square w-[30px] place-items-center overflow-visible rounded-full border-2 border-transparent bg-white p-0 shadow-[0_8px_18px_rgba(35,30,115,0.12)] transition duration-200 dark:bg-[#111827] dark:shadow-[0_8px_18px_rgba(0,0,0,0.28)] min-[421px]:w-[34px] min-[681px]:!w-[clamp(58px,8vw,74px)] min-[681px]:!border-[3px] cursor-pointer text-[0.8rem] font-black text-[#5f45f2] hover:-translate-y-0.5 hover:bg-[#f5f2ff] dark:text-violet-300 dark:hover:bg-violet-500/10 min-[681px]:!text-[clamp(1.08rem,2vw,1.28rem)]" aria-label="Show all joined users, 3 more">+3</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="relative flex h-[clamp(460px,64dvh,700px)] w-full max-w-[650px] flex-col overflow-hidden rounded-[26px] border-[3px] border-[#ded7fb] bg-white/90 shadow-[0_24px_55px_rgba(52,38,143,0.14),inset_0_0_0_1px_rgba(255,255,255,0.9)] dark:border-slate-700 dark:bg-[#111827]/95 dark:shadow-[0_24px_55px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.04)] min-[681px]:h-[clamp(540px,72dvh,780px)] min-[681px]:rounded-[32px] min-[681px]:border-4 min-[681px]:!w-full min-[681px]:!max-w-[min(100%,900px)]" data-question-card="">
+
+            <!-- Game embed: fills the whole card, corners clipped by the card -->
+            <iframe src="game.html" title="Grammar Whack-a-Mole — Boston English Center"
+                class="h-full w-full flex-1 border-0"
+                allow="autoplay; fullscreen" data-game-frame=""></iframe>
+        </section>
+
+        <!-- Navigation / Footer actions -->
+        <footer class="w-full max-w-[900px] flex items-center justify-between px-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <span>Session ID: #TR-B1-9924</span>
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Live Session Connected</span>
+        </footer>
+    </main>
+
+    <div id="participantsModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-violet-100 dark:border-slate-800 flex flex-col gap-4 animate-in fade-in zoom-in duration-200">
+            <div class="flex items-center justify-between border-b border-violet-100 dark:border-slate-800 pb-3">
+                <h3 class="text-xl font-black text-slate-900 dark:text-white">Active Participants (5)</h3>
+                <button type="button" id="closeModalBtn" class="w-8 h-8 rounded-full bg-violet-50 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white grid place-index font-bold cursor-pointer">✕</button>
+            </div>
+            <div class="flex flex-col gap-3 max-h-64 overflow-y-auto pr-1" id="participantsList">
+                <!-- Dynamically populated or static participant rows -->
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-violet-50/50 dark:bg-slate-800/50 border border-violet-100/50 dark:border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-violet-600 text-white font-bold grid place-items-center">S</div>
+                        <div>
+                            <p class="font-bold text-sm text-slate-900 dark:text-white">شيماء (You)</p>
+                            <span class="text-xs text-violet-600 dark:text-violet-400 font-medium">Speaking Now • B1</span>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-bold">Active</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-violet-50/50 dark:bg-slate-800/50 border border-violet-100/50 dark:border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" class="w-10 h-10 rounded-full object-cover" alt="Ikhlas">
+                        <div>
+                            <p class="font-bold text-sm text-slate-900 dark:text-white">Ikhlas</p>
+                            <span class="text-xs text-slate-500 font-medium">Ready • B2</span>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold">Waiting</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-violet-50/50 dark:bg-slate-800/50 border border-violet-100/50 dark:border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-rose-600 text-white font-bold grid place-items-center">M</div>
+                        <div>
+                            <p class="font-bold text-sm text-slate-900 dark:text-white">Mehmet</p>
+                            <span class="text-xs text-slate-500 font-medium">Ready • A2</span>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold">Waiting</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-violet-50/50 dark:bg-slate-800/50 border border-violet-100/50 dark:border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-600 text-white font-bold grid place-items-center">A</div>
+                        <div>
+                            <p class="font-bold text-sm text-slate-900 dark:text-white">Aylin</p>
+                            <span class="text-xs text-slate-500 font-medium">Ready • B1</span>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold">Waiting</span>
+                </div>
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-violet-50/50 dark:bg-slate-800/50 border border-violet-100/50 dark:border-slate-700/50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 text-white font-bold grid place-items-center">C</div>
+                        <div>
+                            <p class="font-bold text-sm text-slate-900 dark:text-white">Can</p>
+                            <span class="text-xs text-slate-500 font-medium">Ready • C1</span>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold">Waiting</span>
+                </div>
+            </div>
+            <button type="button" onclick="closeModal()" class="w-full py-3 rounded-2xl bg-violet-600 text-white font-bold hover:bg-violet-700 transition cursor-pointer">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Theme Toggle Logic
+        const themeToggle = document.getElementById('themeToggle');
+        const themeLabel = document.getElementById('themeLabel');
+        const htmlElement = document.documentElement;
+
+        themeToggle.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+            const isDark = htmlElement.classList.contains('dark');
+            themeLabel.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        });
+
+        // Countdown Timer Logic (60 seconds per turn)
+        let timeLeft = 48;
+        const totalTime = 60;
+        const timerRing = document.querySelector('[data-timer-ring]');
+        const timeLeftDisplay = document.querySelector('[data-time-left]');
+        const circumference = 2 * Math.PI * 52; // r=52
+
+        timerRing.style.strokeDasharray = circumference;
+
+        function updateTimerDisplay() {
+            timeLeftDisplay.textContent = `00:${String(timeLeft).padStart(2, '0')}`;
+            const offset = circumference - (timeLeft / totalTime) * circumference;
+            timerRing.style.strokeDashoffset = offset;
+            
+            if (timeLeft <= 10) {
+                timerRing.style.stroke = '#ef4444'; // Red warning
+            } else {
+                timerRing.style.stroke = 'url(#timerGradient)';
+            }
+        }
+
+        const timerInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft < 0) {
+                timeLeft = 60; // Reset for demo loop
+            }
+            updateTimerDisplay();
+        }, 1000);
+
+        updateTimerDisplay();
+
+        // Speakers Data
+        const speakers = [
+            { name: "شيماء", initials: "S", photo: "", level: "B1", achievements: "4", days: "3", flag: "https://flagcdn.com/w40/tr.png", bg: "linear-gradient(135deg, #2563eb, #7c3aed)" },
+            { name: "Ikhlas", initials: "I", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80", level: "B2", achievements: "6", days: "5", flag: "https://flagcdn.com/w40/tr.png", bg: "" }
+        ];
+
+        function switchSpeaker(index) {
+            const speaker = speakers[index];
+            document.querySelector('[data-student-name]').textContent = speaker.name;
+            document.querySelector('[data-speaker-name-pill]').textContent = speaker.name;
+            document.querySelector('[data-current-level]').textContent = speaker.level;
+            document.querySelector('[data-current-achievements]').textContent = speaker.achievements;
+            document.querySelector('[data-current-days]').textContent = speaker.days;
+
+            const initialsEl = document.querySelector('[data-speaker-initials]');
+            const photoEl = document.querySelector('[data-speaker-photo]');
+
+            if (speaker.photo) {
+                photoEl.src = speaker.photo;
+                photoEl.classList.remove('hidden');
+                initialsEl.classList.add('hidden');
+            } else {
+                photoEl.classList.add('hidden');
+                initialsEl.classList.remove('hidden');
+                initialsEl.textContent = speaker.initials;
+                initialsEl.style.background = speaker.bg;
+            }
+        }
+
+        // Topics rotation
+        const topics = [
+            { topic: "Tech Talk", question: "Did You Know You Dream Every Night?" },
+            { topic: "Environment", question: "What Are Your Favorite Ways to Conserve Energy?" },
+            { topic: "Travel & Culture", question: "If You Could Live in Any Country for One Year, Where?" },
+            { topic: "Future AI", question: "How Will Artificial Intelligence Change Our Daily Jobs?" }
+        ];
+
+        let currentTopicIdx = 0;
+        const topicTitleEl = document.querySelector('[data-topic-title]');
+        const questionTextEl = document.querySelector('[data-question-text]');
+        const nextTopicBtn = document.getElementById('nextTopicBtn');
+
+        nextTopicBtn.addEventListener('click', () => {
+            currentTopicIdx = (currentTopicIdx + 1) % topics.length;
+            topicTitleEl.textContent = topics[currentTopicIdx].topic;
+            questionTextEl.textContent = topics[currentTopicIdx].question;
+        });
+
+        // Audio Replay Simulation
+        const replayAudioBtn = document.getElementById('replayAudioBtn');
+        const audioIcon = document.querySelector('.pq-audio-icon');
+        const audioWave = document.getElementById('audioWave');
+
+        replayAudioBtn.addEventListener('click', () => {
+            audioIcon.classList.add('hidden');
+            audioWave.classList.remove('hidden');
+            audioWave.classList.add('flex');
+            
+            setTimeout(() => {
+                audioWave.classList.remove('flex');
+                audioWave.classList.add('hidden');
+                audioIcon.classList.remove('hidden');
+            }, 3000);
+        });
+
+        // Record Speaking Simulation
+        const recordBtn = document.getElementById('recordBtn');
+        const recordText = document.getElementById('recordText');
+        const recordDot = document.getElementById('recordDot');
+        let isRecording = false;
+
+        recordBtn.addEventListener('click', () => {
+            isRecording = !isRecording;
+            if (isRecording) {
+                recordText.textContent = 'Listening... (Tap to stop)';
+                recordBtn.classList.from = 'from-red-500';
+                recordBtn.classList.to = 'to-pink-600';
+                recordDot.classList.add('bg-amber-300');
+            } else {
+                recordText.textContent = 'Start Speaking';
+                recordDot.classList.remove('bg-amber-300');
+            }
+        });
+
+        // Modal Controls
+        const participantsModal = document.getElementById('participantsModal');
+        const showParticipantsBtn = document.getElementById('showParticipantsBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        showParticipantsBtn.addEventListener('click', () => {
+            participantsModal.classList.remove('hidden');
+            participantsModal.classList.add('flex');
+        });
+
+        function closeModal() {
+            participantsModal.classList.add('hidden');
+            participantsModal.classList.remove('flex');
+        }
+
+        closeModalBtn.addEventListener('click', closeModal);
+        participantsModal.addEventListener('click', (e) => {
+            if (e.target === participantsModal) closeModal();
+        });
+    </script>
+</body>
+</html>

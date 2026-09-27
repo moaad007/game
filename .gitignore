@@ -8,3 +8,6 @@ cache/
 # Optional: ignore common local artifacts
 .DS_Store
 Thumbs.db
+
+# Secrets
+.env
